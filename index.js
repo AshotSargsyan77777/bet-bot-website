@@ -350,8 +350,8 @@ const BACK_MENU = {
 const PACKAGES = {
     pkg_5:  { label: "Գործակից x5",  price: 0 },
     pkg_10: { label: "Գործակից x10", price: 3000 },
-    pkg_25: { label: "Գործակից x20", price: 7000 },
-    pkg_50: { label: "Գործակից x30", price: 10000 },
+    pkg_20: { label: "Գործակից x20", price: 7000 },
+    pkg_30: { label: "Գործակից x30", price: 10000 },
 };
 
 // ---- /start ----
