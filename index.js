@@ -26,7 +26,8 @@ bot.onText(/\/start/, (msg) => {
     `👋 Բարև!\n\nԵս bet check բոտ եմ։\n\n` +
       `📋 Հրամաններ:\n` +
       `/checks — օրվա չեկերը\n` +
-      `/status — իմ կարգավիճակը`
+      `/status — իմ կարգավիճակը\n\n` +
+      `⚠️ Կարևոր. մենք պատասխանատվություն չենք կրում չեկերի արդյունքների համար։ Խաղադրույք կատարիր սեփական պատասխանատվությամբ։`
   );
 });
 
@@ -75,14 +76,16 @@ bot.on("callback_query", (query) => {
 
     pendingPayments.set(chatId, pkgKey);
 
-bot.sendMessage(
-    chatId,
-    `👋 Բարև!\n\nԵս bet check բոտ եմ։\n\n` +
-      `📋 Հրամաններ:\n` +
-      `/checks — օրվա չեկերը\n` +
-      `/status — իմ կարգավիճակը\n\n` +
-      `⚠️ Կարևոր. մենք պատասխանատվություն չենք կրում չեկերի արդյունքների համար։ Խաղադրույք կատարիր սեփական պատասխանատվությամբ։`
-  );
+    bot.sendMessage(
+      chatId,
+      `💳 Վճարման տվյալներ\n\n` +
+        `📦 Փաթեթ: ${pkg.label}\n` +
+        `💰 Գումար: ${pkg.price.toLocaleString()} դրամ\n\n` +
+        `🏦 Քարտի համար:\n<code>${CARD_NUMBER}</code>\n\n` +
+        `Վճարելուց հետո ուղարկիր կտրոնի լուսանկարը։\n\n` +
+        `⚠️ Մենք պատասխանատվություն չենք կրում չեկերի արդյունքների համար։`,
+      { parse_mode: "HTML" }
+    );
   }
 
   bot.answerCallbackQuery(query.id);
@@ -113,18 +116,11 @@ bot.on("photo", (msg) => {
 
 // ---- ԱԴՄԻՆ՝ հաստատել ----
 bot.onText(/\/approve (\d+) (\w+)/, (msg, match) => {
-  console.log("approve received from chat id:", msg.chat.id, "ADMIN_ID:", ADMIN_ID);
-
-  if (msg.chat.id !== ADMIN_ID) {
-    console.log("NOT ADMIN - ignoring");
-    return;
-  }
+  if (msg.chat.id !== ADMIN_ID) return;
 
   const userId = parseInt(match[1]);
   const pkgKey = match[2];
   const pkg = PACKAGES[pkgKey];
-
-  console.log("userId:", userId, "pkgKey:", pkgKey, "pkg:", pkg);
 
   if (!pkg) return bot.sendMessage(ADMIN_ID, "❌ Անհայտ փաթեթ։");
 
