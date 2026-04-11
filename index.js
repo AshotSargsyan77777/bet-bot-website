@@ -4,9 +4,11 @@ const TelegramBot = require("node-telegram-bot-api");
 const TOKEN = "8781934221:AAHlyKDXM2ja6lPeOGHUC7oB5ir5bNQ0qyw";
 const ADMIN_ID = 1005008069;
 const CARD_NUMBER = "YOUR_CARD_NUMBER_HERE"; // քո քարտի համարը
+const PROMO_CODE = "QWAS0101";
 
 // ---- ՓԱԹԵԹՆԵՐ ----
 const PACKAGES = {
+  pkg_5:  { label: "Գործակից x5",  price: 0,    odds: 5  },
   pkg_10: { label: "Գործակից x10", price: 2000, odds: 10 },
   pkg_25: { label: "Գործակից x25", price: 3500, odds: 25 },
   pkg_50: { label: "Գործակից x50", price: 7000, odds: 50 },
@@ -15,6 +17,7 @@ const PACKAGES = {
 // ---- ՊԱՀՈՑՆԵՐ ----
 const subscribers = new Map();
 const pendingPayments = new Map();
+const usedPromos = new Set(); // ով արդեն օգտագործել է պրոմոկոդը
 
 const bot = new TelegramBot(TOKEN, { polling: true });
 
@@ -26,6 +29,7 @@ bot.onText(/\/start/, (msg) => {
     `👋 Բարև!\n\nԵս bet check բոտ եմ։\n\n` +
       `📋 Հրամաններ:\n` +
       `/checks — օրվա չեկերը\n` +
+      `/promo [կոդ] — անվճար պրոմո փաթեթ\n` +
       `/status — իմ կարգավիճակը\n\n` +
       `⚠️ Կարևոր. մենք պատասխանատվություն չենք կրում չեկերի արդյունքների համար։ Խաղադրույք կատարիր սեփական պատասխանատվությամբ։`
   );
@@ -48,6 +52,32 @@ bot.onText(/\/checks/, (msg) => {
       ],
     },
   });
+});
+
+// ---- /promo ----
+bot.onText(/\/promo (.+)/, (msg, match) => {
+  const chatId = msg.chat.id;
+  const code = match[1].trim();
+
+  if (subscribers.has(chatId)) {
+    return bot.sendMessage(chatId, "✅ Դու արդեն բաժանորդ ես։");
+  }
+
+  if (code !== PROMO_CODE) {
+    return bot.sendMessage(chatId, "❌ Սխալ պրոմոկոդ։");
+  }
+
+  if (usedPromos.has(chatId)) {
+    return bot.sendMessage(chatId, "❌ Դու արդեն օգտագործել ես պրոմոկոդը։");
+  }
+
+  usedPromos.add(chatId);
+  subscribers.set(chatId, "pkg_5");
+
+  bot.sendMessage(
+    chatId,
+    `🎉 Պրոմոկոդը ակտիվացվեց!\nՓաթեթ: Գործակից x5 (անվճար)\nԳրիր /checks օրվա չեկ ստանալու համար։`
+  );
 });
 
 // ---- /status ----
@@ -187,6 +217,13 @@ function sendCheck(chatId, pkgKey) {
   const date = new Date().toLocaleDateString("hy-AM");
 
   const checks = {
+    pkg_5:
+      `📊 Չեկ x5 — ${date}\n\n` +
+      `⚽ Team A vs Team B\n` +
+      `🎯 Կանխատեսում: Team A հաղթանակ\n` +
+      `📈 Կոտ: 1.50\n\n` +
+      `⚠️ Խաղադրույք կատարիր պատասխանատվությամբ։`,
+
     pkg_10:
       `📊 Չեկ x10 — ${date}\n\n` +
       `⚽ Team A vs Team B\n` +
@@ -196,12 +233,33 @@ function sendCheck(chatId, pkgKey) {
 
     pkg_25:
       `📊 Չեկ x25 — ${date}\n\n` +
-      `⚽ Team A vs Team B\n` +
-      `🎯 Կանխատեսում: Team A հաղթանակ\n` +
-      `📈 Կոտ: 1.90\n\n` +
-      `⚽ Team C vs Team D\n` +
-      `🎯 Կանխատեսում: Ոչ-ոքի\n` +
-      `📈 Կոտ: 3.10\n\n` +
+      `⚽ Arsenal vs Bournemouth\n` +
+      `🎯 Կանխատեսում: Տոտալ 1.5-ից բարձր\n` +
+      `📈 Կոտ: 1.21\n\n` +
+      `⚽ Real Sociedad vs Alaves\n` +
+      `🎯 Կանխատեսում: Կրկնակի հնարավորություն (Real Sociedad կամ ոչ-ոքի)\n` +
+      `📈 Կոտ: 1.19\n\n` +
+      `⚽ Borussia Dortmund vs Bayer Leverkusen\n` +
+      `🎯 Կանխատեսում: Երկուսն էլ կխփեն — Այո\n` +
+      `📈 Կոտ: 1.50\n\n` +
+      `⚽ Wolfsburg vs Eintracht Frankfurt\n` +
+      `🎯 Կանխատեսում: Տոտալ 2.5-ից բարձր\n` +
+      `📈 Կոտ: 1.61\n\n` +
+      `⚽ Liverpool vs Fulham\n` +
+      `🎯 Կանխատեսում: Liverpool ԻՏ 1.5-ից բարձր\n` +
+      `📈 Կոտ: 1.56\n\n` +
+      `⚽ St. Pauli vs Bayern\n` +
+      `🎯 Կանխատեսում: Bayern հաղթանակ\n` +
+      `📈 Կոտ: 1.38\n\n` +
+      `⚽ Barcelona vs Espanyol\n` +
+      `🎯 Կանխատեսում: Barcelona ԻՏ 1.5-ից բարձր\n` +
+      `📈 Կոտ: 1.29\n\n` +
+      `⚽ Atalanta vs Juventus\n` +
+      `🎯 Կանխատեսում: Երկուսն էլ կխփեն — Այո\n` +
+      `📈 Կոտ: 1.62\n\n` +
+      `⚽ Milan vs Udinese\n` +
+      `🎯 Կանխատեսում: Տոտալ 1.5-ից բարձր\n` +
+      `📈 Կոտ: 1.27\n\n` +
       `⚠️ Խաղադրույք կատարիր պատասխանատվությամբ։`,
 
     pkg_50:
