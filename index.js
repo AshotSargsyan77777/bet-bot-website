@@ -75,15 +75,14 @@ bot.on("callback_query", (query) => {
 
     pendingPayments.set(chatId, pkgKey);
 
-    bot.sendMessage(
-      chatId,
-      `💳 Վճարման տվյալներ\n\n` +
-        `📦 Փաթեթ: ${pkg.label}\n` +
-        `💰 Գումար: ${pkg.price.toLocaleString()} դրամ\n\n` +
-        `🏦 Քարտի համար:\n<code>${CARD_NUMBER}</code>\n\n` +
-        `Վճարելուց հետո ուղարկիր կտրոնի լուսանկարը։`,
-      { parse_mode: "HTML" }
-    );
+bot.sendMessage(
+    chatId,
+    `👋 Բարև!\n\nԵս bet check բոտ եմ։\n\n` +
+      `📋 Հրամաններ:\n` +
+      `/checks — օրվա չեկերը\n` +
+      `/status — իմ կարգավիճակը\n\n` +
+      `⚠️ Կարևոր. մենք պատասխանատվություն չենք կրում չեկերի արդյունքների համար։ Խաղադրույք կատարիր սեփական պատասխանատվությամբ։`
+  );
   }
 
   bot.answerCallbackQuery(query.id);
