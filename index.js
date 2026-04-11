@@ -288,7 +288,7 @@ const fs = require("fs");
 
 // ---- ԿՈՆՖԻԳՈՒՐԱՑԻԱ ----
 // Խորհուրդ: Տոկենը դրեք Railway Environment Variables-ի մեջ (BOT_TOKEN)
-const TOKEN = process.env.BOT_TOKEN || "ԱՅՍՏԵՂ_ԴՐԵՔ_ՁԵՐ_ՆՈՐ_ՏՈԿԵՆԸ";
+const TOKEN = process.env.BOT_TOKEN || "8781934221:AAHlyKDXM2ja6lPeOGHUC7oB5ir5bNQ0qyw";
 const ADMIN_ID = 1005008069;
 const CARD_NUMBER = "5181800050618613";
 const PROMO_CODE = "QWAS0101";
