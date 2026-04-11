@@ -321,8 +321,8 @@ let usedPromos = loadData(PROMO_FILE, []);
 let activeChecks = loadData(CHECKS_FILE, {
     pkg_5: "Այսօրվա x5 չեկը դեռ տեղադրված չէ:",
     pkg_10: "Այսօրվա x10 չեկը դեռ տեղադրված չէ:",
-    pkg_25: "Այսօրվա x25 չեկը դեռ տեղադրված չէ:",
-    pkg_50: "Այսօրվա x50 չեկը դեռ տեղադրված չէ:"
+    pkg_25: "Այսօրվա x20 չեկը դեռ տեղադրված չէ:",
+    pkg_50: "Այսօրվա x30 չեկը դեռ տեղադրված չէ:"
 });
 
 const userStates = new Map();
@@ -349,9 +349,9 @@ const BACK_MENU = {
 
 const PACKAGES = {
     pkg_5:  { label: "Գործակից x5",  price: 0 },
-    pkg_10: { label: "Գործակից x10", price: 2000 },
-    pkg_25: { label: "Գործակից x25", price: 3500 },
-    pkg_50: { label: "Գործակից x50", price: 7000 },
+    pkg_10: { label: "Գործակից x10", price: 3000 },
+    pkg_25: { label: "Գործակից x20", price: 7000 },
+    pkg_50: { label: "Գործակից x30", price: 10000 },
 };
 
 // ---- /start ----
@@ -370,9 +370,9 @@ function handleChecks(chatId) {
     bot.sendMessage(chatId, "📦 Ընտրեք փաթեթ՝", {
         reply_markup: {
             inline_keyboard: [
-                [{ text: "⚡ x10 — 2,000 դրամ", callback_data: "buy_pkg_10" }],
-                [{ text: "🔥 x25 — 3,500 դրամ", callback_data: "buy_pkg_25" }],
-                [{ text: "💎 x50 — 7,000 դրամ", callback_data: "buy_pkg_50" }],
+                [{ text: "⚡ x10 — 3,000 դրամ", callback_data: "buy_pkg_10" }],
+                [{ text: "🔥 x20 — 7,000 դրամ", callback_data: "buy_pkg_20" }],
+                [{ text: "💎 x30 — 10,000 դրամ", callback_data: "buy_pkg_30" }],
             ],
         },
     });
