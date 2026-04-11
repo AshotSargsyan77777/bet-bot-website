@@ -283,21 +283,22 @@
 
 
 
-
 const TelegramBot = require("node-telegram-bot-api");
 const fs = require("fs");
 
 // ---- ԿՈՆՖԻԳՈՒՐԱՑԻԱ ----
 const TOKEN = "8781934221:AAHlyKDXM2ja6lPeOGHUC7oB5ir5bNQ0qyw";
-const ADMIN_ID = 1005008069;
 const CARD_NUMBER = "5181800050618613";
 const PROMO_CODE = "QWAS0101";
+
+// ԱԴՄԻՆՆԵՐԻ ID-ՆԵՐԸ (Ավելացրեք ձեր ընկերոջ ID-ն այստեղ)
+const ADMIN_IDS = [1005008069, 1307510432]; 
 
 const SUBS_FILE = "./subscribers.json";
 const PROMO_FILE = "./used_promos.json";
 const CHECKS_FILE = "./active_checks.json";
 
-// ---- ՖՈՒՆԿՑԻԱՆԵՐ ՏՎՅԱԼՆԵՐԻ ՀԱՄԱՐ ----
+// ---- ՕԺԱՆԴԱԿ ՖՈՒՆԿՑԻԱՆԵՐ ----
 function loadData(filePath, defaultValue) {
     try {
         if (fs.existsSync(filePath)) {
@@ -310,6 +311,9 @@ function loadData(filePath, defaultValue) {
 function saveData(filePath, data) {
     fs.writeFileSync(filePath, JSON.stringify(data, null, 2));
 }
+
+// Ստուգում է՝ արդյոք տվյալ ID-ն ադմին է, թե ոչ
+const isAdmin = (id) => ADMIN_IDS.includes(Number(id));
 
 // ---- ՏՎՅԱԼՆԵՐԻ ՎԵՐԱԿԱՆԳՆՈՒՄ ----
 let subscribers = loadData(SUBS_FILE, {});
@@ -357,13 +361,12 @@ bot.onText(/\/start/, (msg) => {
     bot.sendMessage(chatId, "👋 Բարի գալուստ! Օգտվեք ներքևի կոճակներից․", MAIN_MENU);
 });
 
-// ---- ՉԵԿԵՐԻ ՑՈՒՑԱԴՐՄԱՆ ՖՈՒՆԿՑԻԱ ----
+// ---- ՉԵԿԵՐԻ ՖՈՒՆԿՑԻԱ ----
 function handleChecks(chatId) {
     if (subscribers[chatId]) {
         const pkgKey = subscribers[chatId];
         return bot.sendMessage(chatId, `📊 Ձեր չեկը (${PACKAGES[pkgKey].label}):\n\n${activeChecks[pkgKey]}`, MAIN_MENU);
     }
-
     bot.sendMessage(chatId, "📦 Ընտրեք փաթեթ՝", {
         reply_markup: {
             inline_keyboard: [
@@ -379,10 +382,8 @@ function handleChecks(chatId) {
 bot.on("message", (msg) => {
     const chatId = msg.chat.id.toString();
     const text = msg.text;
-
     if (!text) return;
 
-    // 1. Մենյուի կոճակներ
     if (text === "📊 Օրվա չեկերը") return handleChecks(chatId);
     if (text === "👤 Կարգավիճակ") {
         const st = subscribers[chatId] ? `✅ Ակտիվ: ${PACKAGES[subscribers[chatId]].label}` : "❌ Ակտիվ բաժանորդ չես:";
@@ -398,7 +399,6 @@ bot.on("message", (msg) => {
         return bot.sendMessage(chatId, "Գլխավոր մենյու", MAIN_MENU);
     }
 
-    // 2. Պրոմոկոդի սպասում
     if (userStates.get(chatId) === "AWAITING_PROMO" && !text.startsWith("/")) {
         if (text.trim().toUpperCase() === PROMO_CODE.toUpperCase()) {
             if (usedPromos.includes(chatId)) {
@@ -408,17 +408,17 @@ bot.on("message", (msg) => {
                 subscribers[chatId] = "pkg_5";
                 saveData(SUBS_FILE, subscribers);
                 saveData(PROMO_FILE, usedPromos);
-                bot.sendMessage(chatId, `🎉 Ակտիվացվեց! Գործակից x5-ը հասանելի է:`, MAIN_MENU);
+                bot.sendMessage(chatId, `🎉 Ակտիվացվեց!`, MAIN_MENU);
                 bot.sendMessage(chatId, `📊 Չեկ:\n\n${activeChecks["pkg_5"]}`);
             }
         } else {
-            bot.sendMessage(chatId, "❌ Սխալ կոդ: Փորձեք նորից կամ սեղմեք 'Հետ գնալ'", BACK_MENU);
+            bot.sendMessage(chatId, "❌ Սխալ կոդ:", BACK_MENU);
         }
         userStates.delete(chatId);
     }
 });
 
-// ---- CALLBACKS (Ինլայն կոճակներ) ----
+// ---- CALLBACKS ----
 bot.on("callback_query", (query) => {
     const chatId = query.message.chat.id.toString();
     if (query.data.startsWith("buy_")) {
@@ -429,39 +429,58 @@ bot.on("callback_query", (query) => {
     bot.answerCallbackQuery(query.id);
 });
 
-// ---- ԼՈՒՍԱՆԿԱՐ (Կտրոն) ----
+// ---- ԼՈՒՍԱՆԿԱՐ (Ուղարկվում է բոլոր ադմիններին) ----
 bot.on("photo", (msg) => {
     const chatId = msg.chat.id.toString();
     if (!pendingPayments.has(chatId)) return;
     const pkgKey = pendingPayments.get(chatId);
-    bot.sendPhoto(ADMIN_ID, msg.photo[msg.photo.length - 1].file_id, {
-        caption: `💳 Վճարում\nUser: ${chatId}\nՓաթեթ: ${pkgKey}\nՀաստատել: /approve ${chatId} ${pkgKey}`
+    const fileId = msg.photo[msg.photo.length - 1].file_id;
+
+    ADMIN_IDS.forEach(adminId => {
+        if (adminId !== 0) { // Բաց թողնել եթե ID-ն դեռ փոխված չէ
+            bot.sendPhoto(adminId, fileId, {
+                caption: `💳 Վճարում\nUser: ${chatId}\nՓաթեթ: ${pkgKey}\n\nՀաստատել: /approve ${chatId} ${pkgKey}\nՄերժել: /reject ${chatId}`
+            });
+        }
     });
-    bot.sendMessage(chatId, "📨 Կտրոնն ուղարկված է ադմինին:");
+    bot.sendMessage(chatId, "📨 Կտրոնն ուղարկված է ադմիններին:");
 });
 
 // ---- ԱԴՄԻՆ ՀՐԱՄԱՆՆԵՐ ----
+
+// Հաստատում (Approve)
 bot.onText(/\/approve (\d+) (\w+)/, (msg, match) => {
-    if (msg.chat.id !== ADMIN_ID) return;
+    if (!isAdmin(msg.chat.id)) return;
     const userId = match[1];
     const pkgKey = match[2];
     subscribers[userId] = pkgKey;
     saveData(SUBS_FILE, subscribers);
     bot.sendMessage(userId, `🎉 Ձեր վճարումը հաստատվեց!`, MAIN_MENU);
-    bot.sendMessage(ADMIN_ID, `✅ Հաստատված է:`);
+    
+    // Տեղեկացնում ենք բոլոր ադմիններին
+    ADMIN_IDS.forEach(id => bot.sendMessage(id, `✅ Օգտատեր ${userId}-ը հաստատվեց ադմին ${msg.chat.id}-ի կողմից:`));
 });
 
+// Մերժում (Reject)
+bot.onText(/\/reject (\d+)/, (msg, match) => {
+    if (!isAdmin(msg.chat.id)) return;
+    const userId = match[1];
+    bot.sendMessage(userId, "❌ Ձեր վճարումը մերժվեց:");
+    ADMIN_IDS.forEach(id => bot.sendMessage(id, `❌ Օգտատեր ${userId}-ը մերժվեց ադմին ${msg.chat.id}-ի կողմից:`));
+});
+
+// Չեկի տեղադրում (Set Check)
 bot.onText(/\/setcheck (\w+) (.+)/s, (msg, match) => {
-    if (msg.chat.id !== ADMIN_ID) return;
+    if (!isAdmin(msg.chat.id)) return;
     const pkgKey = match[1];
     const text = match[2];
     if (activeChecks.hasOwnProperty(pkgKey)) {
         activeChecks[pkgKey] = text;
         saveData(CHECKS_FILE, activeChecks);
-        bot.sendMessage(ADMIN_ID, `✅ Չեկը թարմացվեց ${pkgKey}-ի համար:`);
+        bot.sendMessage(msg.chat.id, `✅ Չեկը թարմացվեց ${pkgKey}-ի համար:`);
     } else {
-        bot.sendMessage(ADMIN_ID, "❌ Սխալ pkg անուն:");
+        bot.sendMessage(msg.chat.id, "❌ Սխալ pkg անուն:");
     }
 });
 
-console.log("🤖 Բոտը աշխատում է գործողությունների պանելով...");
+console.log("🤖 Բոտը աշխատում է (Multi-Admin mode)...");
