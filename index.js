@@ -24,7 +24,7 @@ function saveData(filePath, data) { fs.writeFileSync(filePath, JSON.stringify(da
 
 const isAdmin = (id) => ADMIN_IDS.includes(Number(id));
 
-// ---- ԲԵՌՆՈՒՄ ----
+// ---- ՏՎՅԱԼՆԵՐԻ ՎԵՐԱԿԱՆԳՆՈՒՄ ----
 let subscribers = loadData(SUBS_FILE, {});
 let usedPromos = loadData(PROMO_FILE, []);
 const DEFAULT_TEXT = "դեռ տեղադրված չէ:";
@@ -50,13 +50,13 @@ const PACKAGES = {
     pkg_cl: { label: "Champions League", price: 2000 },
 };
 
-// ---- ՄԵՆՅՈՒՆԵՐ ----
+// ---- ՄԵՆՅՈՒՆԵՐ (ՈՒՂՂՎԱԾ) ----
 const MAIN_MENU = {
     reply_markup: {
         keyboard: [
             [{ text: "📊 Օրվա չեկերը" }],
             [{ text: "🎁 Պրոմոկոդ" }, { text: "👤 Կարգավիճակ" }],
-            [{ text: "🆘 Օգնություն" }]
+            [{ text: "🆘 Օգնություն" }] // ՍԱ ԱՎԵԼԱՑՎԱԾ Է
         ],
         resize_keyboard: true,
         persistent: true
@@ -108,7 +108,7 @@ bot.on("message", (msg) => {
     // SUPPORT-Ի ՄՈՒՏՔ
     if (text === "🆘 Օգնություն") {
         userStates.set(chatId, "AWAITING_SUPPORT");
-        return bot.sendMessage(chatId, "Գրեք ձեր հարցը կամ խնդիրը, և մեր ադմինիստրատորները կպատասխանեն ձեզ հենց այստեղ․", BACK_MENU);
+        return bot.sendMessage(chatId, "Գրեք ձեր հարցը, և մենք կպատասխանենք ձեզ հենց այստեղ․", BACK_MENU);
     }
 
     if (text === "🎁 Պրոմոկոդ") {
@@ -122,7 +122,7 @@ bot.on("message", (msg) => {
         return bot.sendMessage(chatId, "Գլխավոր մենյու", MAIN_MENU);
     }
 
-    // SUPPORT ՀԱՂՈՐԴԱԳՐՈՒԹՅԱՆ ՓՈԽԱՆՑՈՒՄ ԱԴՄԻՆԻՆ
+    // SUPPORT ՀԱՂՈՐԴԱԳՐՈՒԹՅՈՒՆ ԱԴՄԻՆԻՆ
     if (userStates.get(chatId) === "AWAITING_SUPPORT") {
         ADMIN_IDS.forEach(adminId => {
             bot.sendMessage(adminId, `📥 Նոր հարց Support-ին:\n👤 Օգտատեր: ${user}\n🆔 ID: ${chatId}\n\n📝 Հարց: ${text}\n\n________________\nՊատասխանելու համար գրեք:\n/reply ${chatId} [տեքստ]`);
@@ -132,7 +132,7 @@ bot.on("message", (msg) => {
         return;
     }
 
-    // ՊՐՈՄՈԿՈԴԻ ՍՏՈՒԳՈՒՄ
+    // ՊՐՈՄՈԿՈԴ
     if (userStates.get(chatId) === "AWAITING_PROMO") {
         const inputCode = text.trim().toUpperCase();
         if (inputCode === settings.currentPromo.toUpperCase()) {
@@ -157,14 +157,12 @@ bot.on("message", (msg) => {
 
 // ---- ԱԴՄԻՆ ՀՐԱՄԱՆՆԵՐ ----
 
-// ՊԱՏԱՍԽԱՆԵԼ SUPPORT-ԻՆ
 bot.onText(/\/reply (\d+) ([\s\S]+)/, (msg, match) => {
     if (!isAdmin(msg.chat.id)) return;
     const userId = match[1];
     const replyText = match[2];
-
     bot.sendMessage(userId, `📩 Պատասխան ադմինիստրատորից:\n\n${replyText}\n\n________________\nGoalking Support`);
-    bot.sendMessage(msg.chat.id, `✅ Պատասխանն ուղարկվեց ID: ${userId} օգտատիրոջը:`);
+    bot.sendMessage(msg.chat.id, `✅ Պատասխանն ուղարկվեց ID: ${userId}`);
 });
 
 bot.onText(/\/viewcheck (\w+)/, (msg, match) => {
@@ -193,6 +191,15 @@ bot.onText(/\/approve (\d+) (\w+)/, (msg, match) => {
     subscribers[match[1]] = match[2];
     saveData(SUBS_FILE, subscribers);
     bot.sendMessage(match[1], `🎉 Ձեր վճարումը հաստատվեց!`, MAIN_MENU);
+    ADMIN_IDS.forEach(id => bot.sendMessage(id, `✅ ID ${match[1]} հաստատվեց:`));
+});
+
+bot.onText(/\/setpromo (.+)/, (msg, match) => {
+    if (!isAdmin(msg.chat.id)) return;
+    settings.currentPromo = match[1].trim();
+    settings.promoCount = 0;
+    saveData(SETTINGS_FILE, settings);
+    bot.sendMessage(msg.chat.id, `✅ Նոր պրոմոկոդ՝ ${settings.currentPromo.toUpperCase()}`);
 });
 
 // ---- CALLBACKS & PHOTO ----
@@ -220,4 +227,4 @@ bot.on("photo", (msg) => {
     bot.sendMessage(chatId, "📨 Կտրոնն ուղարկված է:", MAIN_MENU);
 });
 
-console.log("🤖 Բոտը պատրաստ է (Anonymous Support active)...");
+console.log("🤖 Բոտը պատրաստ է (Support button fixed)...");
