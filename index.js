@@ -9,20 +9,23 @@ const ADMIN_IDS = [1005008069, 1307510432];
 const SUBS_FILE = "./subscribers.json";
 const PROMO_FILE = "./used_promos.json";
 const CHECKS_FILE = "./active_checks.json";
-const SETTINGS_FILE = "./settings.json"; // Նոր ֆայլ պրոմոկոդի համար
+const SETTINGS_FILE = "./settings.json";
 
-// ---- ՏՎՅԱԼՆԵՐԻ ՊԱՀՊԱՆՈՒՄ ----
+// ---- ՕԺԱՆԴԱԿ ՖՈՒՆԿՑԻԱՆԵՐ ----
 function loadData(filePath, defaultValue) {
     try {
         if (fs.existsSync(filePath)) return JSON.parse(fs.readFileSync(filePath, "utf8"));
     } catch (e) { console.error("Error loading file:", filePath); }
     return defaultValue;
 }
-function saveData(filePath, data) { fs.writeFileSync(filePath, JSON.stringify(data, null, 2)); }
+
+function saveData(filePath, data) {
+    fs.writeFileSync(filePath, JSON.stringify(data, null, 2));
+}
 
 const isAdmin = (id) => ADMIN_IDS.includes(Number(id));
 
-// ---- ԲԵՌՆՈՒՄ ----
+// ---- ՏՎՅԱԼՆԵՐԻ ՎԵՐԱԿԱՆԳՆՈՒՄ ----
 let subscribers = loadData(SUBS_FILE, {});
 let usedPromos = loadData(PROMO_FILE, []);
 let activeChecks = loadData(CHECKS_FILE, {
@@ -31,14 +34,13 @@ let activeChecks = loadData(CHECKS_FILE, {
     pkg_20: "Այսօրվա x20 չեկը դեռ տեղադրված չէ:",
     pkg_30: "Այսօրվա x30 չեկը դեռ տեղադրված չէ:"
 });
-// Բեռնում ենք պրոմոկոդը ֆայլից (եթե չկա, դնում ենք QWAS0101)
 let settings = loadData(SETTINGS_FILE, { currentPromo: "QWAS0101" });
 
 const userStates = new Map();
 const pendingPayments = new Map();
 const bot = new TelegramBot(TOKEN, { polling: true });
 
-// ---- ՄԵՆՅՈՒ ----
+// ---- ՄԵՆՅՈՒՆԵՐ ----
 const MAIN_MENU = {
     reply_markup: {
         keyboard: [
@@ -57,6 +59,11 @@ const BACK_MENU = {
         persistent: true
     }
 };
+
+bot.setMyCommands([
+    { command: '/start', description: 'Գլխավոր մենյու' },
+    { command: '/checks', description: 'Տեսնել չեկերը' }
+]);
 
 const PACKAGES = {
     pkg_5:  { label: "Գործակից x5",  price: 0 },
@@ -79,7 +86,7 @@ function handleChecks(chatId) {
         ]
     };
     let messageText = subscribers[chatId] 
-        ? `📊 Ձեր չեկը (${PACKAGES[subscribers[chatId]].label}):\n\n${activeChecks[subscribers[chatId]] || "❌ Չկա"}\n\n━━━━━━━━━━━━━━\n📦 Գնել այլ փաթեթ՝`
+        ? `📊 Ձեր չեկը (${PACKAGES[subscribers[chatId]].label}):\n\n${activeChecks[subscribers[chatId]]}\n\n━━━━━━━━━━━━━━\n📦 Գնել ավելի բարձր գործակցով փաթեթ՝`
         : "📦 Ընտրեք փաթեթ՝";
     bot.sendMessage(chatId, messageText, { reply_markup: { ...buyButtons, ...MAIN_MENU.reply_markup } });
 }
@@ -107,15 +114,12 @@ bot.on("message", (msg) => {
         return bot.sendMessage(chatId, "Գլխավոր մենյու", MAIN_MENU);
     }
 
-    // ՊՐՈՄՈԿՈԴԻ ՍՏՈՒԳՈՒՄ
     if (userStates.get(chatId) === "AWAITING_PROMO") {
         const code = text.trim().toUpperCase();
-        const correctCode = settings.currentPromo.toUpperCase();
-
-        if (code === correctCode) {
+        if (code === settings.currentPromo.toUpperCase()) {
             if (usedPromos.includes(chatId)) {
                 bot.sendMessage(chatId, "❌ Դու արդեն օգտագործել ես պրոմոկոդը:", MAIN_MENU);
-                ADMIN_IDS.forEach(id => bot.sendMessage(id, `⚠️ ${user} (ID: ${chatId}) փորձեց կրկին օգտագործել պրոմոկոդը:`));
+                ADMIN_IDS.forEach(id => bot.sendMessage(id, `⚠️ ${user} (ID: ${chatId}) փորձեց կրկին օգտագործել պրոմոկոդը`));
             } else {
                 usedPromos.push(chatId);
                 subscribers[chatId] = "pkg_5";
@@ -123,7 +127,7 @@ bot.on("message", (msg) => {
                 saveData(PROMO_FILE, usedPromos);
                 bot.sendMessage(chatId, `🎉 Պրոմոկոդը ակտիվացվեց!`, MAIN_MENU);
                 handleChecks(chatId);
-                ADMIN_IDS.forEach(id => bot.sendMessage(id, `✅ ${user} (ID: ${chatId}) ակտիվացրեց պրոմոկոդը (${code}):`));
+                ADMIN_IDS.forEach(id => bot.sendMessage(id, `✅ ${user} (ID: ${chatId}) ակտիվացրեց պրոմոկոդը`));
             }
         } else {
             bot.sendMessage(chatId, "❌ Սխալ կոդ:", BACK_MENU);
@@ -135,26 +139,28 @@ bot.on("message", (msg) => {
 
 // ---- ԱԴՄԻՆ ՀՐԱՄԱՆՆԵՐ ----
 
-// 1. ՆՈՐ ՊՐՈՄՈԿՈԴԻ ՍԱՀՄԱՆՈՒՄ
+// Չեկի տեղադրում (ՈՒՂՂՎԱԾ՝ բազմատող տեքստի համար)
+bot.onText(/\/setcheck\s+(\w+)\s+([\s\S]+)/, (msg, match) => {
+    if (!isAdmin(msg.chat.id)) return;
+    const pkgKey = match[1].trim();
+    const text = match[2].trim();
+
+    if (activeChecks.hasOwnProperty(pkgKey)) {
+        activeChecks[pkgKey] = text;
+        saveData(CHECKS_FILE, activeChecks);
+        bot.sendMessage(msg.chat.id, `✅ Չեկը թարմացվեց ${pkgKey}-ի համար:`);
+    } else {
+        bot.sendMessage(msg.chat.id, "❌ Սխալ pkg: pkg_5, pkg_10, pkg_20, pkg_30");
+    }
+});
+
+// Պրոմոկոդի փոփոխում
 bot.onText(/\/setpromo (.+)/, (msg, match) => {
     if (!isAdmin(msg.chat.id)) return;
     const newPromo = match[1].trim();
     settings.currentPromo = newPromo;
     saveData(SETTINGS_FILE, settings);
     bot.sendMessage(msg.chat.id, `✅ Նոր պրոմոկոդը սահմանված է՝ ${newPromo.toUpperCase()}`);
-});
-
-bot.onText(/\/setcheck (\w+) (.+)/s, (msg, match) => {
-    if (!isAdmin(msg.chat.id)) return;
-    const pkgKey = match[1];
-    const text = match[2];
-    if (activeChecks.hasOwnProperty(pkgKey)) {
-        activeChecks[pkgKey] = text;
-        saveData(CHECKS_FILE, activeChecks);
-        bot.sendMessage(msg.chat.id, `✅ Չեկը թարմացվեց ${pkgKey}-ի համար:`);
-    } else {
-        bot.sendMessage(msg.chat.id, "❌ Սխալ pkg անուն:");
-    }
 });
 
 bot.onText(/\/approve (\d+) (\w+)/, (msg, match) => {
@@ -184,10 +190,10 @@ bot.on("photo", (msg) => {
     const pkgKey = pendingPayments.get(chatId);
     ADMIN_IDS.forEach(adminId => {
         bot.sendPhoto(adminId, msg.photo[msg.photo.length - 1].file_id, {
-            caption: `💳 Վճարում\nUser: ${chatId}\nՓաթեթ: ${pkgKey}\nՀաստատել: /approve ${chatId} ${pkgKey}`
+            caption: `💳 Վճարում\nUser: ${chatId}\nՓաթեթ: ${pkgKey}\nՀաստատել: /approve ${chatId} ${pkgKey}\nՄերժել: /reject ${chatId}`
         });
     });
-    bot.sendMessage(chatId, "📨 Կտրոնն ուղարկված է:", MAIN_MENU);
+    bot.sendMessage(chatId, "📨 Կտրոնն ուղարկված է ադմիններին:", MAIN_MENU);
 });
 
-console.log("🤖 Բոտը պատրաստ է (Dynamic Promo Code active)...");
+console.log("🤖 Բոտը պատրաստ է (Multiline support active)...");
