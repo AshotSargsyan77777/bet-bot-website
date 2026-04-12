@@ -11,7 +11,7 @@ const SUBS_FILE = "./subscribers.json";
 const PROMO_FILE = "./used_promos.json";
 const CHECKS_FILE = "./active_checks.json";
 
-// ---- ՏՎՅԱԼՆԵՐԻ ՊԱՀՊԱՆՈՒՄ ----
+// ---- ՏՎՅԱԼՆԵՐ ----
 function loadData(filePath, defaultValue) {
     try {
         if (fs.existsSync(filePath)) return JSON.parse(fs.readFileSync(filePath, "utf8"));
@@ -35,7 +35,7 @@ const userStates = new Map();
 const pendingPayments = new Map();
 const bot = new TelegramBot(TOKEN, { polling: true });
 
-// ---- ՄԵՆՅՈՒԻ ԿԱՐԳԱՎՈՐՈՒՄՆԵՐ ----
+// ---- ՄԵՆՅՈՒ ----
 const MAIN_MENU = {
     reply_markup: {
         keyboard: [
@@ -55,11 +55,9 @@ const BACK_MENU = {
     }
 };
 
-// 1. Ավելացնում ենք Menu Button (տեքստի դաշտի կողքին)
 bot.setMyCommands([
     { command: '/start', description: 'Գլխավոր մենյու' },
-    { command: '/checks', description: 'Տեսնել չեկերը' },
-    { command: '/status', description: 'Իմ կարգավիճակը' }
+    { command: '/checks', description: 'Տեսնել չեկերը' }
 ]);
 
 const PACKAGES = {
@@ -74,15 +72,6 @@ bot.onText(/\/start/, (msg) => {
     bot.sendMessage(msg.chat.id, "👋 Բարի գալուստ! Օգտվեք ներքևի կոճակներից․", MAIN_MENU);
 });
 
-bot.onText(/\/checks/, (msg) => handleChecks(msg.chat.id.toString()));
-bot.onText(/\/status/, (msg) => sendStatus(msg.chat.id.toString()));
-
-function sendStatus(chatId) {
-    const pkg = subscribers[chatId] ? PACKAGES[subscribers[chatId]] : null;
-    const st = pkg ? `✅ Ակտիվ փաթեթ: ${pkg.label}` : "❌ Ակտիվ բաժանորդ չես:";
-    bot.sendMessage(chatId, st, MAIN_MENU);
-}
-
 function handleChecks(chatId) {
     let messageText = "";
     const buyButtons = {
@@ -92,26 +81,29 @@ function handleChecks(chatId) {
             [{ text: "💎 x30 — 10,000 դրամ", callback_data: "buy_pkg_30" }],
         ]
     };
-
     if (subscribers[chatId]) {
         const pkgKey = subscribers[chatId];
-        const checkContent = activeChecks[pkgKey] || "❌ Չեկը դեռ տեղադրված չէ:";
-        messageText = `📊 Ձեր չեկը (${PACKAGES[pkgKey].label}):\n\n${checkContent}\n\n━━━━━━━━━━━━━━\n📦 Ցանկանու՞մ եք գնել այլ փաթեթ՝`;
+        messageText = `📊 Ձեր չեկը (${PACKAGES[pkgKey].label}):\n\n${activeChecks[pkgKey] || "❌ Դեռ չկա"}\n\n━━━━━━━━━━━━━━\n📦 Գնել այլ փաթեթ՝`;
     } else {
-        messageText = "📦 Դուք չունեք ակտիվ բաժանորդագրություն: Ընտրեք փաթեթ՝";
+        messageText = "📦 Ընտրեք փաթեթ՝";
     }
-    // Ուղարկում ենք Inline կոճակները + MAIN_MENU-ն, որպեսզի ներքևի կոճակները հայտնվեն
     bot.sendMessage(chatId, messageText, { reply_markup: { ...buyButtons, ...MAIN_MENU.reply_markup } });
 }
 
-// ---- MESSAGE HANDLER ----
+// ---- MESSAGE HANDLER (Ադմինի ծանուցումներով) ----
 bot.on("message", (msg) => {
     const chatId = msg.chat.id.toString();
     const text = msg.text;
+    const user = msg.from.username ? `@${msg.from.username}` : msg.from.first_name;
+
     if (!text || text.startsWith("/")) return;
 
     if (text === "📊 Օրվա չեկերը") return handleChecks(chatId);
-    if (text === "👤 Կարգավիճակ") return sendStatus(chatId);
+    if (text === "👤 Կարգավիճակ") {
+        const pkg = subscribers[chatId] ? PACKAGES[subscribers[chatId]] : null;
+        bot.sendMessage(chatId, pkg ? `✅ Ակտիվ: ${pkg.label}` : "❌ Բաժանորդ չես:", MAIN_MENU);
+        return;
+    }
     if (text === "🎁 Պրոմոկոդ") {
         if (subscribers[chatId]) return bot.sendMessage(chatId, "✅ Դու արդեն ունես ակտիվ փաթեթ:", MAIN_MENU);
         userStates.set(chatId, "AWAITING_PROMO");
@@ -122,10 +114,15 @@ bot.on("message", (msg) => {
         return bot.sendMessage(chatId, "Գլխավոր մենյու", MAIN_MENU);
     }
 
+    // ՊՐՈՄՈԿՈԴԻ ՍՏՈՒԳՈՒՄ ԵՎ ԱԴՄԻՆԻՆ ԾԱՆՈՒՑՈՒՄ
     if (userStates.get(chatId) === "AWAITING_PROMO") {
-        if (text.trim().toUpperCase() === PROMO_CODE.toUpperCase()) {
+        const code = text.trim();
+
+        if (code.toUpperCase() === PROMO_CODE.toUpperCase()) {
             if (usedPromos.includes(chatId)) {
                 bot.sendMessage(chatId, "❌ Դու արդեն օգտագործել ես պրոմոկոդը:", MAIN_MENU);
+                // Ծանուցում ադմինին (Կրկնակի փորձ)
+                ADMIN_IDS.forEach(id => bot.sendMessage(id, `⚠️ ${user} (ID: ${chatId}) փորձեց կրկին օգտագործել պրոմոկոդը:`));
             } else {
                 usedPromos.push(chatId);
                 subscribers[chatId] = "pkg_5";
@@ -133,9 +130,13 @@ bot.on("message", (msg) => {
                 saveData(PROMO_FILE, usedPromos);
                 bot.sendMessage(chatId, `🎉 Պրոմոկոդը ակտիվացվեց!`, MAIN_MENU);
                 handleChecks(chatId);
+                // Ծանուցում ադմինին (Ճիշտ կոդ)
+                ADMIN_IDS.forEach(id => bot.sendMessage(id, `✅ ${user} (ID: ${chatId}) ակտիվացրեց պրոմոկոդը:`));
             }
         } else {
             bot.sendMessage(chatId, "❌ Սխալ կոդ:", BACK_MENU);
+            // Ծանուցում ադմինին (Սխալ կոդ)
+            ADMIN_IDS.forEach(id => bot.sendMessage(id, `❌ ${user} (ID: ${chatId}) գրեց սխալ պրոմոկոդ: [${code}]`));
         }
         userStates.delete(chatId);
     }
@@ -146,21 +147,18 @@ bot.on("callback_query", (query) => {
     const chatId = query.message.chat.id.toString();
     if (query.data.startsWith("buy_")) {
         const pkgKey = query.data.replace("buy_", "");
-        if (PACKAGES[pkgKey]) {
-            pendingPayments.set(chatId, pkgKey);
-            bot.sendMessage(chatId, `💳 Քարտ: <code>${CARD_NUMBER}</code>\n💰 Գումար: ${PACKAGES[pkgKey].price.toLocaleString()} դրամ\nՈւղարկիր կտրոնի նկարը:`, { parse_mode: "HTML", ...MAIN_MENU });
-        }
+        pendingPayments.set(chatId, pkgKey);
+        bot.sendMessage(chatId, `💳 Քարտ: <code>${CARD_NUMBER}</code>\n💰 Գումար: ${PACKAGES[pkgKey].price.toLocaleString()} դրամ\nՈւղարկիր կտրոնի նկարը:`, { parse_mode: "HTML" });
     }
     bot.answerCallbackQuery(query.id);
 });
 
-// ---- PHOTO HANDLER ----
+// ---- PHOTO ----
 bot.on("photo", (msg) => {
     const chatId = msg.chat.id.toString();
     if (!pendingPayments.has(chatId)) return;
     const pkgKey = pendingPayments.get(chatId);
     const fileId = msg.photo[msg.photo.length - 1].file_id;
-
     ADMIN_IDS.forEach(adminId => {
         bot.sendPhoto(adminId, fileId, {
             caption: `💳 Վճարում\nUser: ${chatId}\nՓաթեթ: ${pkgKey}\n\nՀաստատել: /approve ${chatId} ${pkgKey}\nՄերժել: /reject ${chatId}`
@@ -169,7 +167,7 @@ bot.on("photo", (msg) => {
     bot.sendMessage(chatId, "📨 Կտրոնն ուղարկված է ադմիններին:", MAIN_MENU);
 });
 
-// ---- ADMINS ----
+// ---- ADMIN COMMANDS ----
 bot.onText(/\/approve (\d+) (\w+)/, (msg, match) => {
     if (!isAdmin(msg.chat.id)) return;
     const userId = match[1];
@@ -193,4 +191,4 @@ bot.onText(/\/setcheck (\w+) (.+)/s, (msg, match) => {
     }
 });
 
-console.log("🤖 Բոտը պատրաստ է (Persistent Menu & Menu Button)...");
+console.log("🤖 Բոտը պատրաստ է (Admin Notifications active)...");
