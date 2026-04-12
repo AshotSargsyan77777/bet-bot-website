@@ -11,21 +11,17 @@ const PROMO_FILE = "./used_promos.json";
 const CHECKS_FILE = "./active_checks.json";
 const SETTINGS_FILE = "./settings.json";
 
-// ---- ՕԺԱՆԴԱԿ ՖՈՒՆԿՑԻԱՆԵՐ ----
+// ---- ՖՈՒՆԿՑԻԱՆԵՐ ----
 function loadData(filePath, defaultValue) {
     try {
         if (fs.existsSync(filePath)) return JSON.parse(fs.readFileSync(filePath, "utf8"));
     } catch (e) { console.error("Error loading file:", filePath); }
     return defaultValue;
 }
-
-function saveData(filePath, data) {
-    fs.writeFileSync(filePath, JSON.stringify(data, null, 2));
-}
+function saveData(filePath, data) { fs.writeFileSync(filePath, JSON.stringify(data, null, 2)); }
 
 const isAdmin = (id) => ADMIN_IDS.includes(Number(id));
 
-// ---- ՏՎՅԱԼՆԵՐԻ ՎԵՐԱԿԱՆԳՆՈՒՄ ----
 let subscribers = loadData(SUBS_FILE, {});
 let usedPromos = loadData(PROMO_FILE, []);
 let activeChecks = loadData(CHECKS_FILE, {
@@ -34,7 +30,9 @@ let activeChecks = loadData(CHECKS_FILE, {
     pkg_20: "Այսօրվա x20 չեկը դեռ տեղադրված չէ:",
     pkg_30: "Այսօրվա x30 չեկը դեռ տեղադրված չէ:"
 });
-let settings = loadData(SETTINGS_FILE, { currentPromo: "QWAS0101" });
+
+// ՈՒՂՂՈՒՄ. Հիմնական կոդը սարքեցի GOAL10
+let settings = loadData(SETTINGS_FILE, { currentPromo: "GOAL10" });
 
 const userStates = new Map();
 const pendingPayments = new Map();
@@ -60,11 +58,6 @@ const BACK_MENU = {
     }
 };
 
-bot.setMyCommands([
-    { command: '/start', description: 'Գլխավոր մենյու' },
-    { command: '/checks', description: 'Տեսնել չեկերը' }
-]);
-
 const PACKAGES = {
     pkg_5:  { label: "Գործակից x5",  price: 0 },
     pkg_10: { label: "Գործակից x10", price: 3000 },
@@ -85,10 +78,16 @@ function handleChecks(chatId) {
             [{ text: "💎 x30 — 10,000 դրամ", callback_data: "buy_pkg_30" }],
         ]
     };
-    let messageText = subscribers[chatId] 
-        ? `📊 Ձեր չեկը (${PACKAGES[subscribers[chatId]].label}):\n\n${activeChecks[subscribers[chatId]]}\n\n━━━━━━━━━━━━━━\n📦 Գնել ավելի բարձր գործակցով փաթեթ՝`
-        : "📦 Ընտրեք փաթեթ՝";
-    bot.sendMessage(chatId, messageText, { reply_markup: { ...buyButtons, ...MAIN_MENU.reply_markup } });
+
+    let messageText = "";
+    if (subscribers[chatId]) {
+        const pkgKey = subscribers[chatId];
+        const label = PACKAGES[pkgKey] ? PACKAGES[pkgKey].label : "Անհայտ";
+        messageText = `📊 Ձեր չեկը (${label}):\n\n${activeChecks[pkgKey]}\n\n━━━━━━━━━━━━━━\n📦 Գնել այլ փաթեթ՝`;
+    } else {
+        messageText = "📦 Դուք չունեք ակտիվ բաժանորդագրություն: Ընտրեք փաթեթ՝";
+    }
+    bot.sendMessage(chatId, messageText, { reply_markup: buyButtons });
 }
 
 // ---- MESSAGE HANDLER ----
@@ -114,12 +113,15 @@ bot.on("message", (msg) => {
         return bot.sendMessage(chatId, "Գլխավոր մենյու", MAIN_MENU);
     }
 
+    // ՊՐՈՄՈԿՈԴԻ ՍՏՈՒԳՈՒՄ
     if (userStates.get(chatId) === "AWAITING_PROMO") {
-        const code = text.trim().toUpperCase();
-        if (code === settings.currentPromo.toUpperCase()) {
+        const inputCode = text.trim().toUpperCase();
+        const activePromo = settings.currentPromo.trim().toUpperCase();
+
+        if (inputCode === activePromo) {
             if (usedPromos.includes(chatId)) {
                 bot.sendMessage(chatId, "❌ Դու արդեն օգտագործել ես պրոմոկոդը:", MAIN_MENU);
-                ADMIN_IDS.forEach(id => bot.sendMessage(id, `⚠️ ${user} (ID: ${chatId}) փորձեց կրկին օգտագործել պրոմոկոդը`));
+                ADMIN_IDS.forEach(id => bot.sendMessage(id, `⚠️ ${user} (ID: ${chatId}) նորից փորձեց [${inputCode}]`));
             } else {
                 usedPromos.push(chatId);
                 subscribers[chatId] = "pkg_5";
@@ -131,59 +133,26 @@ bot.on("message", (msg) => {
             }
         } else {
             bot.sendMessage(chatId, "❌ Սխալ կոդ:", BACK_MENU);
-            ADMIN_IDS.forEach(id => bot.sendMessage(id, `❌ ${user} (ID: ${chatId}) գրեց սխալ պրոմոկոդ: [${code}]`));
+            ADMIN_IDS.forEach(id => bot.sendMessage(id, `❌ ${user} (ID: ${chatId}) գրեց սխալ պրոմոկոդ: [${inputCode}]`));
         }
         userStates.delete(chatId);
     }
 });
 
-// ---- ԱԴՄԻՆ ՀՐԱՄԱՆՆԵՐ ----
-
-// Չեկի տեղադրում (ՈՒՂՂՎԱԾ՝ բազմատող տեքստի համար)
-bot.onText(/\/setcheck\s+(\w+)\s+([\s\S]+)/, (msg, match) => {
-    if (!isAdmin(msg.chat.id)) return;
-    const pkgKey = match[1].trim();
-    const text = match[2].trim();
-
-    if (activeChecks.hasOwnProperty(pkgKey)) {
-        activeChecks[pkgKey] = text;
-        saveData(CHECKS_FILE, activeChecks);
-        bot.sendMessage(msg.chat.id, `✅ Չեկը թարմացվեց ${pkgKey}-ի համար:`);
-    } else {
-        bot.sendMessage(msg.chat.id, "❌ Սխալ pkg: pkg_5, pkg_10, pkg_20, pkg_30");
-    }
-});
-
-// Պրոմոկոդի փոփոխում
-bot.onText(/\/setpromo (.+)/, (msg, match) => {
-    if (!isAdmin(msg.chat.id)) return;
-    const newPromo = match[1].trim();
-    settings.currentPromo = newPromo;
-    saveData(SETTINGS_FILE, settings);
-    bot.sendMessage(msg.chat.id, `✅ Նոր պրոմոկոդը սահմանված է՝ ${newPromo.toUpperCase()}`);
-});
-
-bot.onText(/\/approve (\d+) (\w+)/, (msg, match) => {
-    if (!isAdmin(msg.chat.id)) return;
-    const userId = match[1];
-    const pkgKey = match[2];
-    subscribers[userId] = pkgKey;
-    saveData(SUBS_FILE, subscribers);
-    bot.sendMessage(userId, `🎉 Ձեր վճարումը հաստատվեց!`, MAIN_MENU);
-    ADMIN_IDS.forEach(id => bot.sendMessage(id, `✅ ${userId} հաստատվեց:`));
-});
-
-// ---- CALLBACKS & PHOTO ----
+// ---- CALLBACKS ----
 bot.on("callback_query", (query) => {
     const chatId = query.message.chat.id.toString();
     if (query.data.startsWith("buy_")) {
         const pkgKey = query.data.replace("buy_", "");
-        pendingPayments.set(chatId, pkgKey);
-        bot.sendMessage(chatId, `💳 Քարտ: <code>${CARD_NUMBER}</code>\n💰 Գումար: ${PACKAGES[pkgKey].price.toLocaleString()} դրամ\nՈւղարկիր կտրոնի նկարը:`, { parse_mode: "HTML" });
+        if (PACKAGES[pkgKey]) {
+            pendingPayments.set(chatId, pkgKey);
+            bot.sendMessage(chatId, `💳 Քարտ: <code>${CARD_NUMBER}</code>\n💰 Գումար: ${PACKAGES[pkgKey].price.toLocaleString()} դրամ\nՈւղարկիր կտրոնի նկարը:`, { parse_mode: "HTML" });
+        }
     }
     bot.answerCallbackQuery(query.id);
 });
 
+// ---- PHOTO ----
 bot.on("photo", (msg) => {
     const chatId = msg.chat.id.toString();
     if (!pendingPayments.has(chatId)) return;
@@ -196,4 +165,33 @@ bot.on("photo", (msg) => {
     bot.sendMessage(chatId, "📨 Կտրոնն ուղարկված է ադմիններին:", MAIN_MENU);
 });
 
-console.log("🤖 Բոտը պատրաստ է (Multiline support active)...");
+// ---- ԱԴՄԻՆ ՀՐԱՄԱՆՆԵՐ ----
+bot.onText(/\/setcheck\s+(\w+)\s+([\s\S]+)/, (msg, match) => {
+    if (!isAdmin(msg.chat.id)) return;
+    const pkgKey = match[1].trim();
+    const text = match[2].trim();
+    if (activeChecks.hasOwnProperty(pkgKey)) {
+        activeChecks[pkgKey] = text;
+        saveData(CHECKS_FILE, activeChecks);
+        bot.sendMessage(msg.chat.id, `✅ Չեկը թարմացվեց ${pkgKey}-ի համար:`);
+    }
+});
+
+bot.onText(/\/setpromo (.+)/, (msg, match) => {
+    if (!isAdmin(msg.chat.id)) return;
+    settings.currentPromo = match[1].trim();
+    saveData(SETTINGS_FILE, settings);
+    bot.sendMessage(msg.chat.id, `✅ Նոր պրոմոկոդ՝ ${settings.currentPromo.toUpperCase()}`);
+});
+
+bot.onText(/\/approve (\d+) (\w+)/, (msg, match) => {
+    if (!isAdmin(msg.chat.id)) return;
+    const userId = match[1];
+    const pkgKey = match[2];
+    subscribers[userId] = pkgKey;
+    saveData(SUBS_FILE, subscribers);
+    bot.sendMessage(userId, `🎉 Ձեր վճարումը հաստատվեց!`, MAIN_MENU);
+    ADMIN_IDS.forEach(id => bot.sendMessage(id, `✅ ${userId} հաստատվեց:`));
+});
+
+console.log("🤖 Բոտը պատրաստ է (Default Promo: GOAL10)...");
