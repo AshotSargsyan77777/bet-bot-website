@@ -4,7 +4,7 @@ const fs = require("fs");
 // ---- ԿՈՆՖԻԳՈՒՐԱՑԻԱ ----
 const TOKEN = "8781934221:AAHlyKDXM2ja6lPeOGHUC7oB5ir5bNQ0qyw";
 const CARD_NUMBER = "5181800050618613";
-const ADMIN_IDS = [1005008069, 1307510432]; 
+const ADMIN_IDS = [1005008069]; 
 
 const SUBS_FILE = "./subscribers.json";
 const PROMO_FILE = "./used_promos.json";
