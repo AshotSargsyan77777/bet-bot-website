@@ -7,7 +7,7 @@ const CARD_NUMBER = "5181800050618613";
 const ADMIN_IDS = [1005008069, 1307510432]; 
 
 // ԱՅՍՏԵՂ ԴՐԵՔ ՁԵՐ VIP ԿԱՆԱԼԻ ՀՂՈՒՄԸ
-const VIP_CHANNEL_LINK = "https://t.me/+ԱՅՍՏԵՂ_ԴՐԵՔ_ՀՂՈՒՄԸ";
+const VIP_CHANNEL_LINK = "https://t.me/+gbMtx2wt-UA4NGRi";
 
 const SUBS_FILE = "./subscribers.json";
 const PROMO_FILE = "./used_promos.json";
