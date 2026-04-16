@@ -6,14 +6,14 @@ const TOKEN = "8781934221:AAHlyKDXM2ja6lPeOGHUC7oB5ir5bNQ0qyw";
 const CARD_NUMBER = "5181800050618613";
 const ADMIN_IDS = [1005008069, 1307510432]; 
 
-// ԱՅՍՏԵՂ ԳՐԵՔ ՁԵՐ VIP ԿԱՆԱԼԻ ՀՂՈՒՄԸ
-const VIP_CHANNEL_LINK = "https://t.me/+gbMtx2wt-UA4NGRi";
+// ԱՅՍՏԵՂ ԴՐԵՔ ՁԵՐ VIP ԿԱՆԱԼԻ ՀՂՈՒՄԸ
+const VIP_CHANNEL_LINK = "https://t.me/+ԱՅՍՏԵՂ_ԴՐԵՔ_ՀՂՈՒՄԸ";
 
 const SUBS_FILE = "./subscribers.json";
 const PROMO_FILE = "./used_promos.json";
 const CHECKS_FILE = "./active_checks.json";
 const SETTINGS_FILE = "./settings.json";
-const VIP_FILE = "./vip_subscribers.json"; // Նոր ֆայլ VIP-ների համար
+const VIP_FILE = "./vip_subscribers.json";
 
 const DISCLAIMER = "\n\n⚠️ Ուշադրություն. Մենք պատասխանատվություն չենք կրում չեկերի արդյունքների համար: Խաղադրույք կատարեք սեփական պատասխանատվությամբ:";
 
@@ -28,9 +28,9 @@ function saveData(filePath, data) { fs.writeFileSync(filePath, JSON.stringify(da
 
 const isAdmin = (id) => ADMIN_IDS.includes(Number(id));
 
-// ---- ՏՎՅԱԼՆԵՐԻ ՎԵՐԱԿԱՆԳՆՈՒՄ ----
+// ---- ԲԵՌՆՈՒՄ ----
 let subscribers = loadData(SUBS_FILE, {});
-let vipSubscribers = loadData(VIP_FILE, {}); // Բեռնում ենք VIP-ներին
+let vipSubscribers = loadData(VIP_FILE, {});
 let usedPromos = loadData(PROMO_FILE, []);
 const DEFAULT_TEXT = "դեռ տեղադրված չէ:";
 
@@ -47,22 +47,21 @@ const userStates = new Map();
 const pendingPayments = new Map();
 const bot = new TelegramBot(TOKEN, { polling: true });
 
-// ՓԱԹԵԹՆԵՐ (Ավելացված է VIP-ը)
 const PACKAGES = {
     pkg_5:  { label: "🎁 Պրոմո Փաթեթ", price: 0 },
     pkg_10: { label: "Գործակից x10", price: 3000 },
     pkg_20: { label: "Գործակից x20", price: 7000 },
     pkg_30: { label: "Գործակից x30", price: 10000 },
     pkg_cl: { label: "🏆 Champions League", price: 2000 },
-    pkg_vip: { label: "👑 VIP Կանալ", price: 2000 } // Նոր փաթեթ
+    pkg_vip: { label: "👑 VIP Կանալ", price: 2000 }
 };
 
-// ---- ՄԵՆՅՈՒՆԵՐ (Ավելացված է VIP կոճակը) ----
+// ---- ՄԵՆՅՈՒՆԵՐ (ՈՒՂՂՎԱԾ) ----
 const MAIN_MENU = {
     reply_markup: {
         keyboard: [
             [{ text: "📊 Օրվա չեկերը" }],
-            [{ text: "👑 VIP Կանալ" }], // Նոր տող
+            [{ text: "👑 VIP Կանալ" }], // ԱՎԵԼԱՑՎԱԾ Է ԱՌԱՆՁԻՆ ՏՈՂՈՒՄ
             [{ text: "🎁 Պրոմոկոդ" }, { text: "👤 Կարգավիճակ" }],
             [{ text: "🆘 Օգնություն" }]
         ],
@@ -93,9 +92,8 @@ function handleChecks(chatId) {
             [{ text: "🏆 Champions League — 2,000 դրամ", callback_data: "buy_pkg_cl" }]
         ]
     };
-
     let messageText = subscribers[chatId] 
-        ? `📊 Ձեր չեկը (${PACKAGES[subscribers[chatId]].label}):\n\n${activeChecks[subscribers[chatId]]}${DISCLAIMER}\n\n━━━━━━━━━━━━━━\n📦 Գնել այլ փաթեթ՝`
+        ? `📊 Ձեր չեկը (${PACKAGES[subscribers[chatId]].label}):\n\n${activeChecks[subscribers[chatId]]}${DISCLAIMER}`
         : "📦 Ընտրեք փաթեթ՝";
     bot.sendMessage(chatId, messageText, { reply_markup: buyButtons });
 }
@@ -110,30 +108,25 @@ bot.on("message", (msg) => {
 
     if (text === "📊 Օրվա չեկերը") return handleChecks(chatId);
     
-    // --- ՆՈՐ ԲԱԺԻՆ: VIP ԿԱՆԱԼ ---
     if (text === "👑 VIP Կանալ") {
         if (vipSubscribers[chatId]) {
-            return bot.sendMessage(chatId, `🎉 Դուք ունեք ակտիվ մուտք VIP կանալին:\n\n🔗 Ահա ձեր հղումը՝\n${VIP_CHANNEL_LINK}`, MAIN_MENU);
+            return bot.sendMessage(chatId, `🎉 Դուք ունեք ակտիվ VIP մուտք:\n\n🔗 Հղումը՝\n${VIP_CHANNEL_LINK}`, MAIN_MENU);
         }
-        return bot.sendMessage(chatId, "👑 VIP Տելեգրամ կանալ\n\nՄիանալով VIP կանալին՝ դուք կստանաք հատուկ էքսպրեսներ և ավելի բարձր գործակիցներ:\n\n💰 Արժեքը՝ 2,000 դրամ", {
-            reply_markup: {
-                inline_keyboard: [
-                    [{ text: "💎 Գնել մուտք (2,000 դրամ)", callback_data: "buy_pkg_vip" }]
-                ]
-            }
+        return bot.sendMessage(chatId, "👑 Միացեք մեր VIP կանալին:\n\n💰 Արժեքը՝ 2,000 դրամ", {
+            reply_markup: { inline_keyboard: [[{ text: "💎 Գնել մուտք (2,000 դրամ)", callback_data: "buy_pkg_vip" }]] }
         });
     }
 
     if (text === "👤 Կարգավիճակ") {
         const pkg = subscribers[chatId] ? PACKAGES[subscribers[chatId]] : null;
-        let st = pkg ? `✅ Ակտիվ չեկի փաթեթ: ${pkg.label}` : "❌ Ակտիվ չեկի փաթեթ չունես:";
+        let st = pkg ? `✅ Ակտիվ չեկ: ${pkg.label}` : "❌ Ակտիվ չեկ չունես:";
         if (vipSubscribers[chatId]) st += "\n👑 VIP Կանալ: Ակտիվ է";
         return bot.sendMessage(chatId, st, MAIN_MENU);
     }
     
     if (text === "🆘 Օգնություն") {
         userStates.set(chatId, "AWAITING_SUPPORT");
-        return bot.sendMessage(chatId, "Գրեք ձեր հարցը, և մենք կպատասխանենք ձեզ հենց այստեղ․", BACK_MENU);
+        return bot.sendMessage(chatId, "Գրեք ձեր հարցը․", BACK_MENU);
     }
 
     if (text === "🎁 Պրոմոկոդ") {
@@ -147,17 +140,15 @@ bot.on("message", (msg) => {
         return bot.sendMessage(chatId, "Գլխավոր մենյու", MAIN_MENU);
     }
 
-    // Support
+    // Support Response
     if (userStates.get(chatId) === "AWAITING_SUPPORT") {
-        ADMIN_IDS.forEach(adminId => {
-            bot.sendMessage(adminId, `📥 Support հարց:\n👤 User: ${user}\n🆔 ID: ${chatId}\n📝 Հարց: ${text}\n\nՊատասխանել՝ /reply ${chatId} [տեքստ]`);
-        });
-        bot.sendMessage(chatId, "✅ Ձեր հաղորդագրությունն ուղարկվեց։", MAIN_MENU);
+        ADMIN_IDS.forEach(id => bot.sendMessage(id, `📥 Support:\n👤 User: ${user}\n🆔 ID: ${chatId}\n📝 Հարց: ${text}\n\n/reply ${chatId} [տեքստ]`));
+        bot.sendMessage(chatId, "✅ Ուղարկվեց։", MAIN_MENU);
         userStates.delete(chatId);
         return;
     }
 
-    // Promo
+    // Promo Activation
     if (userStates.get(chatId) === "AWAITING_PROMO") {
         const inputCode = text.trim().toUpperCase();
         if (inputCode === settings.currentPromo.toUpperCase()) {
@@ -183,9 +174,11 @@ bot.on("message", (msg) => {
 // ---- CALLBACKS ----
 bot.on("callback_query", (query) => {
     const chatId = query.message.chat.id.toString();
-    if (query.data.startsWith("buy_")) {
-        const pkgKey = query.data.replace("buy_", "");
-        if (PACKAGES[pkgKey]) {
+    const pkgKey = query.data.replace("buy_", "");
+    if (PACKAGES[pkgKey]) {
+        if (pkgKey !== "pkg_vip" && activeChecks[pkgKey] && activeChecks[pkgKey].includes(DEFAULT_TEXT)) {
+            bot.sendMessage(chatId, "❌ Չեկը պատրաստ չէ: Փորձեք 10 րոպեից:");
+        } else {
             pendingPayments.set(chatId, pkgKey);
             bot.sendMessage(chatId, `💳 Քարտ: <code>${CARD_NUMBER}</code>\n💰 Գումար: ${PACKAGES[pkgKey].price.toLocaleString()} դրամ\n\nՈւղարկիր կտրոնի նկարը:${DISCLAIMER}`, { parse_mode: "HTML" });
         }
@@ -199,49 +192,26 @@ bot.on("photo", (msg) => {
     if (!pendingPayments.has(chatId)) return;
     const pkgKey = pendingPayments.get(chatId);
     ADMIN_IDS.forEach(id => bot.sendPhoto(id, msg.photo[msg.photo.length - 1].file_id, {
-        caption: `💳 Վճարում\nUser: ${chatId}\nՓաթեթ: ${PACKAGES[pkgKey].label}\nՀաստատել: /approve ${chatId} ${pkgKey}\nՄերժել: /reject ${chatId}`
+        caption: `💳 Վճարում\nUser: ${chatId}\nՓաթեթ: ${PACKAGES[pkgKey].label}\n/approve ${chatId} ${pkgKey}\n/reject ${chatId}`
     }));
-    bot.sendMessage(chatId, "📨 Կտրոնն ուղարկված է ադմիններին:", MAIN_MENU);
+    bot.sendMessage(chatId, "📨 Կտրոնն ուղարկված է:", MAIN_MENU);
 });
 
-// ---- ԱԴՄԻՆ ՀՐԱՄԱՆՆԵՐ ----
+// ---- ԱԴՄԻՆՆԵՐ ----
 bot.onText(/\/approve (\d+) (\w+)/, (msg, match) => {
     if (!isAdmin(msg.chat.id)) return;
     const userId = match[1];
     const pkgKey = match[2];
-
     if (pkgKey === "pkg_vip") {
         vipSubscribers[userId] = true;
         saveData(VIP_FILE, vipSubscribers);
-        bot.sendMessage(userId, `🎉 Շնորհավորում ենք! Դուք ակտիվացրեցիք VIP մուտքը:\n\n🔗 Ահա հղումը՝\n${VIP_CHANNEL_LINK}`, MAIN_MENU);
+        bot.sendMessage(userId, `🎉 VIP Մուտքը ակտիվացվեց!\n🔗 Հղումը՝\n${VIP_CHANNEL_LINK}`, MAIN_MENU);
     } else {
         subscribers[userId] = pkgKey;
         saveData(SUBS_FILE, subscribers);
         bot.sendMessage(userId, `🎉 Ձեր վճարումը հաստատվեց!`, MAIN_MENU);
     }
-    
-    ADMIN_IDS.forEach(id => bot.sendMessage(id, `✅ ${userId} հաստատվեց ${PACKAGES[pkgKey].label}-ի համար:`));
-});
-
-bot.onText(/\/reply (\d+) ([\s\S]+)/, (msg, match) => {
-    if (!isAdmin(msg.chat.id)) return;
-    bot.sendMessage(match[1], `📩 Պատասխան ադմինից:\n\n${match[2]}\n\n________________\nGoalking Support`);
-    bot.sendMessage(msg.chat.id, `✅ Ուղարկվեց:`);
-});
-
-bot.onText(/\/stats/, (msg) => {
-    if (!isAdmin(msg.chat.id)) return;
-    bot.sendMessage(msg.chat.id, `📊 Վիճակագրություն\n\n🎟 Պրոմո՝ ${settings.currentPromo}\n👥 Օգտագործողներ՝ ${settings.promoCount}\n✅ Չեկի բաժանորդներ՝ ${Object.keys(subscribers).length}\n👑 VIP բաժանորդներ՝ ${Object.keys(vipSubscribers).length}`);
-});
-
-bot.onText(/\/setcheck\s+(\w+)\s+([\s\S]+)/, (msg, match) => {
-    if (!isAdmin(msg.chat.id)) return;
-    const pkgKey = match[1].trim();
-    if (activeChecks.hasOwnProperty(pkgKey)) {
-        activeChecks[pkgKey] = match[2].trim();
-        saveData(CHECKS_FILE, activeChecks);
-        bot.sendMessage(msg.chat.id, `✅ Թարմացվեց:`);
-    }
+    bot.sendMessage(msg.chat.id, "✅ Հաստատված է:");
 });
 
 bot.onText(/\/setpromo (.+)/, (msg, match) => {
@@ -249,7 +219,36 @@ bot.onText(/\/setpromo (.+)/, (msg, match) => {
     settings.currentPromo = match[1].trim();
     settings.promoCount = 0;
     saveData(SETTINGS_FILE, settings);
-    bot.sendMessage(msg.chat.id, `✅ Նոր պրոմոկոդ՝ ${settings.currentPromo.toUpperCase()}`);
+    for (const id in subscribers) { if (subscribers[id] === "pkg_5") delete subscribers[id]; }
+    saveData(SUBS_FILE, subscribers);
+    usedPromos = []; saveData(PROMO_FILE, usedPromos);
+    bot.sendMessage(msg.chat.id, `✅ Նոր պրոմո՝ ${settings.currentPromo.toUpperCase()} (Բազան մաքրվեց)`);
 });
 
-console.log("🤖 Բոտը պատրաստ է (VIP Channel active)...");
+bot.onText(/\/reply (\d+) ([\s\S]+)/, (msg, match) => {
+    if (!isAdmin(msg.chat.id)) return;
+    bot.sendMessage(match[1], `📩 Պատասխան ադմինից:\n\n${match[2]}\n\n________________\nGoalking Support`);
+});
+
+bot.onText(/\/viewcheck (\w+)/, (msg, match) => {
+    if (!isAdmin(msg.chat.id)) return;
+    const key = match[1];
+    if (activeChecks[key]) bot.sendMessage(msg.chat.id, `📝 ${key}: ${activeChecks[key]}`);
+});
+
+bot.onText(/\/setcheck\s+(\w+)\s+([\s\S]+)/, (msg, match) => {
+    if (!isAdmin(msg.chat.id)) return;
+    const key = match[1].trim();
+    if (activeChecks.hasOwnProperty(key)) {
+        activeChecks[key] = match[2].trim();
+        saveData(CHECKS_FILE, activeChecks);
+        bot.sendMessage(msg.chat.id, `✅ Թարմացվեց:`);
+    }
+});
+
+bot.onText(/\/stats/, (msg) => {
+    if (!isAdmin(msg.chat.id)) return;
+    bot.sendMessage(msg.chat.id, `📊 Վիճակագրություն\n🎟 Պրոմո՝ ${settings.currentPromo}\n👥 Պրոմո օգտագործողներ՝ ${settings.promoCount}\n✅ Չեկի բաժանորդներ՝ ${Object.keys(subscribers).length}\n👑 VIP բաժանորդներ՝ ${Object.keys(vipSubscribers).length}`);
+});
+
+console.log("🤖 Բոտը միացված է VIP ֆունկցիայով...");
