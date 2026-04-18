@@ -49,7 +49,7 @@ const PACKAGES = {
     pkg_20: { label: "Գործակից x20", price: 7000 },
     pkg_30: { label: "Գործակից x30", price: 10000 },
     pkg_cl: { label: "🏆 Champions League", price: 2000 },
-    pkg_vip: { label: "👑 VIP Կանալ", price: 4000 }
+    pkg_vip: { label: "👑 VIP Կանալ", price: 5000 }
 };
 
 const MAIN_MENU = {
@@ -101,7 +101,7 @@ bot.on("message", (msg) => {
     
     if (text === "👑 VIP Կանալ") {
         if (vipSubscribers[chatId]) return bot.sendMessage(chatId, `🎉 VIP հղումը՝\n${VIP_CHANNEL_LINK}`, MAIN_MENU);
-        return bot.sendMessage(chatId, `👑 Միացեք VIP կանալին:\n💰 Արժեքը՝ 4,000 դրամ`, { 
+        return bot.sendMessage(chatId, `👑 Միացեք VIP կանալին:\n💰 Արժեքը՝ 5,000 դրամ`, { 
             reply_markup: { inline_keyboard: [[{ text: "💎 Գնել մուտք", callback_data: "buy_pkg_vip" }]] } 
         });
     }
