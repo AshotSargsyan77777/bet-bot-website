@@ -1,11 +1,15 @@
 const TelegramBot = require("node-telegram-bot-api");
 const fs = require("fs");
+const express = require("express");
 
 // ---- ԿՈՆՖԻԳՈՒՐԱՑԻԱ ----
-const TOKEN = "8781934221:AAHlyKDXM2ja6lPeOGHUC7oB5ir5bNQ0qyw";
-const CARD_NUMBER = "5181800050618613";
-const ADMIN_IDS = [1005008069, 1307510432]; 
+require("dotenv").config();
+
+const TOKEN = process.env.BOT_TOKEN;
+const CARD_NUMBER = process.env.CARD_NUMBER;
 const VIP_CHANNEL_LINK = "https://t.me/+gbMtx2wt-UA4NGRi";
+const N8N_INTERNAL_KEY = process.env.N8N_INTERNAL_KEY;
+const ADMIN_IDS = (process.env.ADMIN_ID || "").split(",").map(Number).filter(Boolean);
 
 const SUBS_FILE = "./subscribers.json";
 const PROMO_FILE = "./used_promos.json";
@@ -17,18 +21,17 @@ const DISCLAIMER = "\n\n⚠️ Ուշադրություն. Մենք պատասխ
 
 // ---- ՖՈՒՆԿՑԻԱՆԵՐ ----
 function loadData(filePath, defaultValue) {
-    try { if (fs.existsSync(filePath)) return JSON.parse(fs.readFileSync(filePath, "utf8")); } 
+    try { if (fs.existsSync(filePath)) return JSON.parse(fs.readFileSync(filePath, "utf8")); }
     catch (e) { console.error("Error loading file:", filePath); }
     return defaultValue;
 }
 function saveData(filePath, data) { fs.writeFileSync(filePath, JSON.stringify(data, null, 2)); }
 const isAdmin = (id) => ADMIN_IDS.includes(Number(id));
 
-// Ֆունկցիա՝ մյուս ադմինին տեղեկացնելու համար
-function syncWithAdmins(message, senderId) {
+function syncAdmins(message, senderId) {
     ADMIN_IDS.forEach(id => {
         if (id !== Number(senderId)) {
-            bot.sendMessage(id, `🔔 **Admin Action:**\n${message}`, { parse_mode: "Markdown" }).catch(e => {});
+            bot.sendMessage(id, `🔔 **Admin Sync:**\n${message}`, { parse_mode: "Markdown" }).catch(e => {});
         }
     });
 }
@@ -40,11 +43,14 @@ let usedPromos = loadData(PROMO_FILE, []);
 const DEFAULT_TEXT = "դեռ տեղադրված չէ:";
 
 let activeChecks = loadData(CHECKS_FILE, {
-    pkg_5: `🎁 Պրոմո չեկը ${DEFAULT_TEXT}`,
-    pkg_10: `Այսօրվա x10 չեկը ${DEFAULT_TEXT}`,
-    pkg_20: `Այսօրվա x20 չեկը ${DEFAULT_TEXT}`,
-    pkg_30: `Այսօրվա x30 չեկը ${DEFAULT_TEXT}`,
-    pkg_cl: `Champions League չեկը ${DEFAULT_TEXT}`
+    standard_3x:   `Այսօրվա x3 չեկը ${DEFAULT_TEXT}`,
+    standard_5x:   `Այսօրվա x5 չեկը ${DEFAULT_TEXT}`,
+    standard_10x:  `Այսօրվա x10 չեկը ${DEFAULT_TEXT}`,
+    standard_20x:  `Այսօրվա x20 չեկը ${DEFAULT_TEXT}`,
+    champions_3x:  `Champions League x3 չեկը ${DEFAULT_TEXT}`,
+    champions_5x:  `Champions League x5 չեկը ${DEFAULT_TEXT}`,
+    champions_10x: `Champions League x10 չեկը ${DEFAULT_TEXT}`,
+    pkg_5: `🎁 Պրոմո չեկը ${DEFAULT_TEXT}`
 });
 let settings = loadData(SETTINGS_FILE, { currentPromo: "SHOT5", promoCount: 0 });
 
@@ -53,12 +59,15 @@ const pendingPayments = new Map();
 const bot = new TelegramBot(TOKEN, { polling: true });
 
 const PACKAGES = {
-    pkg_5:  { label: "🎁 Պրոմո Փաթեթ", price: 0 },
-    pkg_10: { label: "Գործակից x10", price: 3000 },
-    pkg_20: { label: "Գործակից x20", price: 7000 },
-    pkg_30: { label: "Գործակից x30", price: 10000 },
-    pkg_cl: { label: "🏆 Champions League", price: 2000 },
-    pkg_vip: { label: "👑 VIP Կանալ", price: 5000 }
+    standard_3x:   { label: "Գործակից x3",  price: 2000 },
+    standard_5x:   { label: "Գործակից x5",  price: 3000 },
+    standard_10x:  { label: "Գործակից x10", price: 5000 },
+    standard_20x:  { label: "Գործակից x20", price: 7000 },
+    champions_3x:  { label: "🏆 Champions League x3",  price: 2000 },
+    champions_5x:  { label: "🏆 Champions League x5",  price: 3000 },
+    champions_10x: { label: "🏆 Champions League x10", price: 7000 },
+    pkg_vip: { label: "👑 VIP Կանալ", price: 5000 },
+    pkg_5:   { label: "🎁 Պրոմո Փաթեթ", price: 0 }
 };
 
 const MAIN_MENU = {
@@ -80,13 +89,16 @@ bot.onText(/\/start/, (msg) => {
 function handleChecks(chatId) {
     const buyButtons = {
         inline_keyboard: [
-            [{ text: "⚡ x10 — 3,000 դրամ", callback_data: "buy_pkg_10" }],
-            [{ text: "🔥 x20 — 7,000 դրամ", callback_data: "buy_pkg_20" }],
-            [{ text: "💎 x30 — 10,000 դրամ", callback_data: "buy_pkg_30" }],
-            [{ text: "🏆 Champions League — 2,000 դրամ", callback_data: "buy_pkg_cl" }]
+            [{ text: "⚡ x3 — 2,000 դրամ", callback_data: "buy_standard_3x" }],
+            [{ text: "🎯 x5 — 3,000 դրամ", callback_data: "buy_standard_5x" }],
+            [{ text: "🔥 x10 — 5,000 դրամ", callback_data: "buy_standard_10x" }],
+            [{ text: "💎 x20 — 7,000 դրամ", callback_data: "buy_standard_20x" }],
+            [{ text: "🏆 CL x3 — 2,000 դրամ", callback_data: "buy_champions_3x" }],
+            [{ text: "🏆 CL x5 — 3,000 դրամ", callback_data: "buy_champions_5x" }],
+            [{ text: "🏆 CL x10 — 7,000 դրամ", callback_data: "buy_champions_10x" }]
         ]
     };
-    let messageText = subscribers[chatId] 
+    let messageText = subscribers[chatId]
         ? `📊 Ձեր չեկը (${PACKAGES[subscribers[chatId]].label}):\n\n${activeChecks[subscribers[chatId]]}${DISCLAIMER}`
         : "📦 Ընտրեք փաթեթ՝";
     bot.sendMessage(chatId, messageText, { reply_markup: buyButtons });
@@ -103,8 +115,8 @@ bot.on("message", (msg) => {
     if (text === "📊 Օրվա չեկերը") return handleChecks(chatId);
     if (text === "👑 VIP Կանալ") {
         if (vipSubscribers[chatId]) return bot.sendMessage(chatId, `🎉 VIP հղումը՝\n${VIP_CHANNEL_LINK}`, MAIN_MENU);
-        return bot.sendMessage(chatId, `👑 Միացեք VIP կանալին:\n💰 Արժեքը՝ 5,000 դրամ`, { 
-            reply_markup: { inline_keyboard: [[{ text: "💎 Գնել մուտք", callback_data: "buy_pkg_vip" }]] } 
+        return bot.sendMessage(chatId, `👑 Միացեք VIP կանալին:\n💰 Արժեքը՝ 5,000 դրամ`, {
+            reply_markup: { inline_keyboard: [[{ text: "💎 Գնել մուտք", callback_data: "buy_pkg_vip" }]] }
         });
     }
     if (text === "👤 Կարգավիճակ") {
@@ -120,14 +132,12 @@ bot.on("message", (msg) => {
     }
     if (text === "🔙 Հետ գնալ") { userStates.delete(chatId); return bot.sendMessage(chatId, "Գլխավոր մենյու", MAIN_MENU); }
 
-    // Support
     if (userStates.get(chatId) === "AWAITING_SUPPORT") {
         ADMIN_IDS.forEach(id => bot.sendMessage(id, `📥 Support:\n👤 User: ${user}\n🆔 ID: ${chatId}\n📝 Հարց: ${text}\n\n/reply ${chatId} [տեքստ]`));
         bot.sendMessage(chatId, "✅ Ուղարկվեց։", MAIN_MENU);
         userStates.delete(chatId); return;
     }
 
-    // Promo Activation
     if (userStates.get(chatId) === "AWAITING_PROMO") {
         const inputCode = text.trim().toUpperCase();
         if (inputCode === settings.currentPromo.toUpperCase()) {
@@ -136,7 +146,7 @@ bot.on("message", (msg) => {
                 usedPromos.push(chatId); subscribers[chatId] = "pkg_5"; settings.promoCount += 1;
                 saveData(SUBS_FILE, subscribers); saveData(PROMO_FILE, usedPromos); saveData(SETTINGS_FILE, settings);
                 bot.sendMessage(chatId, `🎉 Պրոմոկոդը ակտիվացվեց!`, MAIN_MENU); handleChecks(chatId);
-                ADMIN_IDS.forEach(id => bot.sendMessage(id, `✅ ${user} (ID: ${chatId}) ակտիվացրեց պրոմոկոդը` ));
+                ADMIN_IDS.forEach(id => bot.sendMessage(id, `✅ ${user} (ID: ${chatId}) ակտիվացրեց պրոմոկոդը`));
             }
         } else { bot.sendMessage(chatId, "❌ Սխալ կոդ:", BACK_MENU); }
         userStates.delete(chatId);
@@ -171,20 +181,27 @@ bot.on("photo", (msg) => {
     bot.sendMessage(chatId, "📨 Կտրոնն ուղարկված է ադմիններին:", MAIN_MENU);
 });
 
-// ---- ԱԴՄԻՆ ՀՐԱՄԱՆՆԵՐ (SYNCED) ----
+// ---- ԱԴՄԻՆ ՀՐԱՄԱՆՆԵՐ ----
 
-// ՀԱՍՏԱՏՈՒՄ
 bot.onText(/\/approve (\d+) (\w+)/, (msg, match) => {
     if (!isAdmin(msg.chat.id)) return;
     const userId = match[1]; const pkgKey = match[2];
-    if (pkgKey === "pkg_vip") { vipSubscribers[userId] = true; saveData(VIP_FILE, vipSubscribers); bot.sendMessage(userId, `🎉 VIP Մուտքը ակտիվացվեց!\n🔗 ${VIP_CHANNEL_LINK}`, MAIN_MENU); }
-    else { subscribers[userId] = pkgKey; saveData(SUBS_FILE, subscribers); bot.sendMessage(userId, `🎉 Ձեր վճարումը հաստատվեց!`, MAIN_MENU); }
-    
+    if (pkgKey === "pkg_vip") {
+        vipSubscribers[userId] = true; saveData(VIP_FILE, vipSubscribers);
+        bot.sendMessage(userId, `🎉 VIP Մուտքը ակտիվացվեց!\n🔗 ${VIP_CHANNEL_LINK}`, MAIN_MENU);
+    } else {
+        subscribers[userId] = pkgKey; saveData(SUBS_FILE, subscribers);
+        const checkText = activeChecks[pkgKey] || `${PACKAGES[pkgKey].label} չեկը ${DEFAULT_TEXT}`;
+        bot.sendMessage(
+            userId,
+            `🎉 Ձեր վճարումը հաստատվեց!\n\n📊 Ձեր չեկը (${PACKAGES[pkgKey].label}):\n\n${checkText}${DISCLAIMER}`,
+            MAIN_MENU
+        );
+    }
     bot.sendMessage(msg.chat.id, "✅ Հաստատված է:");
     syncAdmins(`✅ Ադմին ${msg.from.first_name}-ը հաստատեց ${userId}-ի վճարումը (${pkgKey})`, msg.chat.id);
 });
 
-// ՄԵՐԺՈՒՄ
 bot.onText(/\/reject (\d+)/, (msg, match) => {
     if (!isAdmin(msg.chat.id)) return;
     const userId = match[1];
@@ -193,7 +210,6 @@ bot.onText(/\/reject (\d+)/, (msg, match) => {
     syncAdmins(`❌ Ադմին ${msg.from.first_name}-ը մերժեց ${userId}-ի վճարումը`, msg.chat.id);
 });
 
-// ՊՐՈՄՈԿՈԴԻ ՓՈՓՈԽՈՒՄ
 bot.onText(/\/setpromo (.+)/, (msg, match) => {
     if (!isAdmin(msg.chat.id)) return;
     settings.currentPromo = match[1].trim(); settings.promoCount = 0; saveData(SETTINGS_FILE, settings);
@@ -203,7 +219,6 @@ bot.onText(/\/setpromo (.+)/, (msg, match) => {
     syncAdmins(`🆕 Ադմին ${msg.from.first_name}-ը փոխեց պրոմոկոդը՝ **${settings.currentPromo.toUpperCase()}**`, msg.chat.id);
 });
 
-// ՉԵԿԻ ԹԱՐՄԱՑՈՒՄ
 bot.onText(/\/setcheck\s+(\w+)\s+([\s\S]+)/, (msg, match) => {
     if (!isAdmin(msg.chat.id)) return;
     const pkg = match[1].trim();
@@ -214,7 +229,6 @@ bot.onText(/\/setcheck\s+(\w+)\s+([\s\S]+)/, (msg, match) => {
     }
 });
 
-// SUPPORT ՊԱՏԱՍԽԱՆ
 bot.onText(/\/reply (\d+) ([\s\S]+)/, (msg, match) => {
     if (!isAdmin(msg.chat.id)) return;
     const userId = match[1]; const reply = match[2];
@@ -223,25 +237,53 @@ bot.onText(/\/reply (\d+) ([\s\S]+)/, (msg, match) => {
     syncAdmins(`📩 Ադմին ${msg.from.first_name}-ը պատասխանեց ID ${userId}-ին:\n"${reply}"`, msg.chat.id);
 });
 
-// VIEW CHECK
 bot.onText(/\/viewcheck (\w+)/, (msg, match) => {
     if (!isAdmin(msg.chat.id)) return;
     if (activeChecks[match[1]]) bot.sendMessage(msg.chat.id, `📝 ${activeChecks[match[1]]}`);
 });
 
-// STATS
 bot.onText(/\/stats/, (msg) => {
     if (!isAdmin(msg.chat.id)) return;
     bot.sendMessage(msg.chat.id, `📊 Վիճակագրություն\n🎟 Պրոմո՝ ${settings.currentPromo}\n👥 Պրոմո օգտագործողներ՝ ${settings.promoCount}\n✅ Չեկի բաժանորդներ՝ ${Object.keys(subscribers).length}\n👑 VIP բաժանորդներ՝ ${Object.keys(vipSubscribers).length}`, MAIN_MENU);
 });
 
-// Helper ֆունկցիա սինքրոնացման համար
-function syncAdmins(message, senderId) {
-    ADMIN_IDS.forEach(id => {
-        if (id !== Number(senderId)) {
-            bot.sendMessage(id, `🔔 **Admin Sync:**\n${message}`, { parse_mode: "Markdown" }).catch(e => {});
-        }
-    });
+// ---- WEBHOOK SERVER (n8n → package-երի ավտոմատ ստացում) ----
+function authenticateSecret(req, res, next) {
+    if (req.headers["x-internal-key"] !== N8N_INTERNAL_KEY) {
+        return res.status(401).json({ error: "unauthorized" });
+    }
+    next();
 }
+
+app.post("/internal/packages", authenticateSecret, (req, res) => {
+    try {
+        const packages = req.body.packages;
+        if (!Array.isArray(packages)) return res.status(400).json({ error: "packages must be an array" });
+
+        let updated = 0;
+        for (const pkg of packages) {
+            const pkgKey = `${pkg.tier}_${pkg.package}`;
+            if (!PACKAGES[pkgKey]) continue;
+
+            if (!pkg.available) {
+                activeChecks[pkgKey] = `${PACKAGES[pkgKey].label} չեկը այսօր հասանելի չէ:`;
+                updated++;
+                continue;
+            }
+
+            const lines = pkg.selections.map((s, i) => `${i + 1}. ${s.fixture} — ${s.selection} (${s.odd})`);
+            activeChecks[pkgKey] = `🎯 Ընդհանուր գործակիցը՝ ${pkg.combined_odds}x\n\n${lines.join("\n")}`;
+            updated++;
+        }
+
+        saveData(CHECKS_FILE, activeChecks);
+        res.json({ ok: true, updated });
+    } catch (err) {
+        console.error("packages webhook error:", err);
+        res.status(500).json({ error: "internal error" });
+    }
+});
+
+app.listen(process.env.PORT || 3000, () => console.log("🌐 Webhook server listening"));
 
 console.log("🤖 Բոտը միացված է (Full Sync mode)...");
