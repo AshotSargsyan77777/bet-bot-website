@@ -10,6 +10,7 @@ const CARD_NUMBER = process.env.CARD_NUMBER;
 const VIP_CHANNEL_LINK = "https://t.me/+gbMtx2wt-UA4NGRi";
 const N8N_INTERNAL_KEY = process.env.N8N_INTERNAL_KEY;
 const ADMIN_IDS = (process.env.ADMIN_ID || "").split(",").map(Number).filter(Boolean);
+const RENDER_URL = process.env.RENDER_EXTERNAL_URL;
 
 const SUBS_FILE = "./subscribers.json";
 const PROMO_FILE = "./used_promos.json";
@@ -18,6 +19,10 @@ const SETTINGS_FILE = "./settings.json";
 const VIP_FILE = "./vip_subscribers.json";
 
 const DISCLAIMER = "\n\n⚠️ Ուշադրություն. Մենք պատասխանատվություն չենք կրում չեկերի արդյունքների համար: Խաղադրույք կատարեք սեփական պատասխանատվությամբ:";
+
+// ---- EXPRESS APP (պիտի declare լինի ամեն ինչից առաջ) ----
+const app = express();
+app.use(express.json());
 
 // ---- ՖՈՒՆԿՑԻԱՆԵՐ ----
 function loadData(filePath, defaultValue) {
@@ -56,7 +61,9 @@ let settings = loadData(SETTINGS_FILE, { currentPromo: "SHOT5", promoCount: 0 })
 
 const userStates = new Map();
 const pendingPayments = new Map();
-const bot = new TelegramBot(TOKEN, { polling: true });
+const bot = new TelegramBot(TOKEN);
+
+const WEBHOOK_PATH = `/bot${TOKEN}`;
 
 const PACKAGES = {
     standard_3x:   { label: "Գործակից x3",  price: 2000 },
@@ -247,7 +254,18 @@ bot.onText(/\/stats/, (msg) => {
     bot.sendMessage(msg.chat.id, `📊 Վիճակագրություն\n🎟 Պրոմո՝ ${settings.currentPromo}\n👥 Պրոմո օգտագործողներ՝ ${settings.promoCount}\n✅ Չեկի բաժանորդներ՝ ${Object.keys(subscribers).length}\n👑 VIP բաժանորդներ՝ ${Object.keys(vipSubscribers).length}`, MAIN_MENU);
 });
 
-// ---- WEBHOOK SERVER (n8n → package-երի ավտոմատ ստացում) ----
+// ---- WEBHOOK ROUTES ----
+
+// Telegram-ից եկող update-երը (webhook mode)
+app.post(WEBHOOK_PATH, (req, res) => {
+    bot.processUpdate(req.body);
+    res.sendStatus(200);
+});
+
+// Health check (keep-alive ping-ի համար)
+app.get("/health", (req, res) => res.send("OK"));
+
+// n8n-ից package-երի ավտոմատ ստացում
 function authenticateSecret(req, res, next) {
     if (req.headers["x-internal-key"] !== N8N_INTERNAL_KEY) {
         return res.status(401).json({ error: "unauthorized" });
@@ -284,6 +302,17 @@ app.post("/internal/packages", authenticateSecret, (req, res) => {
     }
 });
 
-app.listen(process.env.PORT || 3000, () => console.log("🌐 Webhook server listening"));
+// ---- START SERVER + SET WEBHOOK ----
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => {
+    console.log("🌐 Webhook server listening on port " + PORT);
+    if (RENDER_URL) {
+        bot.setWebHook(`${RENDER_URL}${WEBHOOK_PATH}`)
+            .then(() => console.log("✅ Telegram webhook set to " + RENDER_URL + WEBHOOK_PATH))
+            .catch((e) => console.error("❌ Failed to set webhook:", e.message));
+    } else {
+        console.warn("⚠️ RENDER_EXTERNAL_URL not found — webhook not set automatically");
+    }
+});
 
-console.log("🤖 Բոտը միացված է (Full Sync mode)...");
+console.log("🤖 Բոտը միացված է (Full Sync mode, webhook)...");
