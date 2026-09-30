@@ -412,14 +412,26 @@ app.post("/internal/packages", authenticateSecret, (req, res) => {
 
 // ================= START =================
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
+app.listen(PORT, async () => {
     console.log("🌐 Webhook server listening on port " + PORT);
-    if (RENDER_URL) {
-        bot.setWebHook(`${RENDER_URL}${WEBHOOK_PATH}`)
-            .then(() => console.log("✅ Telegram webhook set"))
-            .catch((e) => console.error("❌ Failed to set webhook:", e.message));
-    } else {
+    if (!RENDER_URL) {
         console.warn("⚠️ RENDER_EXTERNAL_URL not found — webhook not set automatically");
+        return;
+    }
+    try {
+        const r = await fetch(`https://api.telegram.org/bot${TOKEN}/setWebhook`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                url: `${RENDER_URL}${WEBHOOK_PATH}`,
+                allowed_updates: ["message", "callback_query"],
+                drop_pending_updates: false,
+            }),
+        });
+        const j = await r.json();
+        console.log(j.ok ? "✅ Telegram webhook set (message + callback_query)" : "❌ setWebhook failed: " + j.description);
+    } catch (e) {
+        console.error("❌ Failed to set webhook:", e.message);
     }
 });
 
