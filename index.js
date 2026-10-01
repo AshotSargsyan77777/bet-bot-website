@@ -455,20 +455,20 @@ function explainSelection(s) {
     if (s.market === "BTTS") {
         if (!xg) return "";
         if (/Yes$/i.test(sel)) {
-            return `⚽ Երկու թիմի վերջին խաղերի ցուցանիշներով էլ ակնկալվում են գոլեր (${xg[0]} և ${xg[1]}), ուստի երկուսի գոլ խփելը հավանական է։`;
+            return `Երկու թիմի վերջին խաղերի ցուցանիշներով էլ ակնկալվում են գոլեր (${xg[0]} և ${xg[1]}), ուստի երկուսի գոլ խփելը հավանական է։`;
         }
         const weakIsHome = xg[0] <= xg[1];
         const weakName = weakIsHome ? homeName : awayName;
         const weakXg = weakIsHome ? xg[0] : xg[1];
-        return `⚽ ${weakName}-ի հարձակումը վերջին խաղերի ցուցանիշներով թույլ է (ակնկալվում է ընդամենը ${weakXg} գոլ), ուստի երկուսի գոլ խփելը քիչ հավանական է։`;
+        return `${weakName}-ի հարձակումը վերջին խաղերի ցուցանիշներով թույլ է (ակնկալվում է ընդամենը ${weakXg} գոլ), ուստի երկուսի գոլ խփելը քիչ հավանական է։`;
     }
 
     if (s.market === "OU") {
         const lm = sel.match(/(\d+(?:\.\d+)?)/);
         if (!xgTotal || !lm) return "";
         return /over/i.test(sel)
-            ? `⚽ Ակնկալվում է գոլային խաղ՝ ընդհանուր մոտ ${xgTotal[0]} գոլ (գիծը՝ ${lm[1]})։`
-            : `⚽ Ակնկալվում է փակ խաղ՝ ընդհանուր մոտ ${xgTotal[0]} գոլ, ինչը ${lm[1]}-ից ցածր է։`;
+            ? `Ակնկալվում է գոլային խաղ՝ ընդհանուր մոտ ${xgTotal[0]} գոլ (գիծը՝ ${lm[1]})։`
+            : `Ակնկալվում է փակ խաղ՝ ընդհանուր մոտ ${xgTotal[0]} գոլ, ինչը ${lm[1]}-ից ցածր է։`;
     }
 
     if (s.market === "MATCH_WINNER" || s.market === "DOUBLE_CHANCE") {
@@ -493,28 +493,39 @@ function explainSelection(s) {
         }
 
         if (isDC) {
-            const head = `🛡 Երկակի շանս. ${name}-ը չպարտվելու դեպքում խաղադրույքը հաղթում է։`;
+            const head = `Երկակի շանս. ${name}-ը չպարտվելու դեպքում խաղադրույքը հաղթում է։`;
             return reasonsList.length ? `${head} ${name}-ը ${reasonsList.join(", ")}։` : head;
         }
-        if (reasonsList.length) return `📊 ${name}-ը ${reasonsList.join(", ")}։`;
-        if (p !== null) return `📊 Մոդելը այս ելքին տալիս է ~${p}% հավանականություն։`;
+        if (reasonsList.length) return `${name}-ը ${reasonsList.join(", ")}։`;
+        if (p !== null) return `Մոդելը այս ելքին տալիս է ~${p}% հավանականություն։`;
     }
     return "";
 }
 
+const NUM_EMOJI = ["1️⃣", "2️⃣", "3️⃣", "4️⃣", "5️⃣", "6️⃣", "7️⃣", "8️⃣", "9️⃣", "🔟"];
+const MARKET_EMOJI = { MATCH_WINNER: "🏆", DOUBLE_CHANCE: "🛡", BTTS: "🥅", OU: "⚽" };
+const LINE = "━━━━━━━━━━━━━━";
+
 function formatPackage(pkg) {
     const build = (withWhy) => pkg.selections.map((s, i) => {
-        let line = `${i + 1}. ${s.fixture} — ${s.selection} (${s.odd})`;
+        const num = NUM_EMOJI[i] || `${i + 1}.`;
+        const odd = Number(s.odd);
+        const rows = [
+            `${num} 🏟 ${s.fixture}`,
+            `${MARKET_EMOJI[s.market] || "🎯"} ${s.selection}`,
+            `💰 Գործակից՝ ${Number.isFinite(odd) ? odd.toFixed(2) : s.odd}`,
+        ];
         if (withWhy) {
             const why = explainSelection(s);
-            if (why) line += `\n${why}`;
+            if (why) rows.push(`💡 ${why}`);
         }
-        return line;
-    }).join(withWhy ? "\n\n" : "\n");
+        return rows.join("\n");
+    }).join(withWhy ? "\n\n" : "\n\n");
 
     let body = build(true);
     if (body.length > 3000) body = build(false); // Telegram-ի 4096 սահմանից պաշտպանություն
-    let text = `🎯 Ընդհանուր գործակիցը՝ ${pkg.combined_odds}x\n\n${body}`;
+    const total = Number(pkg.combined_odds);
+    let text = `⚽ GOALKING ՉԵԿ\n🎯 Ընդհանուր գործակից՝ ${Number.isFinite(total) ? total.toFixed(2) : pkg.combined_odds}x\n${LINE}\n\n${body}\n\n${LINE}`;
     if (pkg.estimated_hit_chance !== undefined) {
         text += `\n\n📈 Գնահատված հավանականություն՝ ~${pkg.estimated_hit_chance}% (գնահատական է, ոչ երաշխիք)`;
     }
