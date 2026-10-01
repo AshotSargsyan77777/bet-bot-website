@@ -366,9 +366,82 @@ function authenticateSecret(req, res, next) {
     next();
 }
 
+// Բացատրություն յուրաքանչյուր խաղադրույքի համար՝ n8n-ի ուղարկած reasons/probability դաշտերից (տրամաբանությունը չի փոխվում)
+function explainSelection(s) {
+    const reasons = Array.isArray(s.reasons) ? s.reasons.join(" | ") : "";
+    const num = (re) => { const m = reasons.match(re); return m ? m.slice(1).map(Number) : null; };
+    const xg = num(/xG\s+([\d.]+)\/([\d.]+)/) || num(/Expected goals \(shrunk\):\s*([\d.]+)\s*-\s*([\d.]+)/);
+    const xgTotal = num(/xG total\s+([\d.]+)/);
+    const form = num(/Form: home\s+([\d.]+)%\s+vs away\s+([\d.]+)%/);
+    const h2h = num(/H2H\s+(\d+)-(\d+)-(\d+)\s+in\s+(\d+)/);
+    const mkt = num(/Market \(no margin\):\s*(\d+)\/(\d+)\/(\d+)/);
+    const p = Number.isFinite(s.probability) ? Math.round(s.probability * 100) : null;
+    const sel = String(s.selection || "");
+    const [homeName, awayName] = String(s.fixture || "").split(" - ");
+
+    if (s.market === "BTTS") {
+        if (!xg) return "";
+        if (/Yes$/i.test(sel)) {
+            return `⚽ Երկու թիմի վերջին խաղերի ցուցանիշներով էլ ակնկալվում են գոլեր (${xg[0]} և ${xg[1]}), ուստի երկուսի գոլ խփելը հավանական է։`;
+        }
+        const weakIsHome = xg[0] <= xg[1];
+        const weakName = weakIsHome ? homeName : awayName;
+        const weakXg = weakIsHome ? xg[0] : xg[1];
+        return `⚽ ${weakName}-ի հարձակումը վերջին խաղերի ցուցանիշներով թույլ է (ակնկալվում է ընդամենը ${weakXg} գոլ), ուստի երկուսի գոլ խփելը քիչ հավանական է։`;
+    }
+
+    if (s.market === "OU") {
+        const lm = sel.match(/(\d+(?:\.\d+)?)/);
+        if (!xgTotal || !lm) return "";
+        return /over/i.test(sel)
+            ? `⚽ Ակնկալվում է գոլային խաղ՝ ընդհանուր մոտ ${xgTotal[0]} գոլ (գիծը՝ ${lm[1]})։`
+            : `⚽ Ակնկալվում է փակ խաղ՝ ընդհանուր մոտ ${xgTotal[0]} գոլ, ինչը ${lm[1]}-ից ցածր է։`;
+    }
+
+    if (s.market === "MATCH_WINNER" || s.market === "DOUBLE_CHANCE") {
+        const isDC = s.market === "DOUBLE_CHANCE";
+        const name = sel.replace(/\s*\((Home|Away) Win\)$/, "").replace(/ or Draw$/, "");
+        const isHome = /\(Home Win\)$/.test(sel) || (isDC && name === homeName);
+        const reasonsList = [];
+
+        if (form) {
+            const fav = isHome ? form[0] : form[1];
+            const opp = isHome ? form[1] : form[0];
+            if (fav > opp + 5) reasonsList.push("վերջին խաղերում ավելի լավ ձևի մեջ է");
+        }
+        if (h2h && h2h[3] > 0) {
+            const favW = isHome ? h2h[0] : h2h[2];
+            const oppW = isHome ? h2h[2] : h2h[0];
+            if (favW > oppW) reasonsList.push(`անմիջական հանդիպումներում առավելություն ունի (${favW} հաղթանակ ${h2h[3]} խաղից)`);
+        }
+        if (mkt) {
+            const side = isHome ? mkt[0] : mkt[2];
+            if (side >= Math.max(...mkt)) reasonsList.push("նաև շուկայի կողմից համարվում է ֆավորիտ");
+        }
+
+        if (isDC) {
+            const head = `🛡 Երկակի շանս. ${name}-ը չպարտվելու դեպքում խաղադրույքը հաղթում է։`;
+            return reasonsList.length ? `${head} ${name}-ը ${reasonsList.join(", ")}։` : head;
+        }
+        if (reasonsList.length) return `📊 ${name}-ը ${reasonsList.join(", ")}։`;
+        if (p !== null) return `📊 Մոդելը այս ելքին տալիս է ~${p}% հավանականություն։`;
+    }
+    return "";
+}
+
 function formatPackage(pkg) {
-    const lines = pkg.selections.map((s, i) => `${i + 1}. ${s.fixture} — ${s.selection} (${s.odd})`);
-    let text = `🎯 Ընդհանուր գործակիցը՝ ${pkg.combined_odds}x\n\n${lines.join("\n")}`;
+    const build = (withWhy) => pkg.selections.map((s, i) => {
+        let line = `${i + 1}. ${s.fixture} — ${s.selection} (${s.odd})`;
+        if (withWhy) {
+            const why = explainSelection(s);
+            if (why) line += `\n${why}`;
+        }
+        return line;
+    }).join(withWhy ? "\n\n" : "\n");
+
+    let body = build(true);
+    if (body.length > 3000) body = build(false); // Telegram-ի 4096 սահմանից պաշտպանություն
+    let text = `🎯 Ընդհանուր գործակիցը՝ ${pkg.combined_odds}x\n\n${body}`;
     if (pkg.estimated_hit_chance !== undefined) {
         text += `\n\n📈 Գնահատված հավանականություն՝ ~${pkg.estimated_hit_chance}% (գնահատական է, ոչ երաշխիք)`;
     }
