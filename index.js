@@ -33,19 +33,29 @@ const app = express();
 app.use(express.json({ limit: "2mb" }));
 
 // ================= ՊԱՀՈՑ (Upstash Redis, հակառակ դեպքում՝ ֆայլեր) =================
-const REDIS_URL = (process.env.UPSTASH_REDIS_REST_URL || "").trim().replace(/\/+$/, "");
-const REDIS_TOKEN = (process.env.UPSTASH_REDIS_REST_TOKEN || "").trim();
+const stripQuotes = (v) => String(v || "").trim().replace(/^["']+|["']+$/g, "").trim();
+let REDIS_URL = stripQuotes(process.env.UPSTASH_REDIS_REST_URL).replace(/\/+$/, "");
+if (REDIS_URL && !/^[a-z][a-z0-9+.-]*:\/\//i.test(REDIS_URL)) REDIS_URL = "https://" + REDIS_URL; // պակաս https://
+const REDIS_TOKEN = stripQuotes(process.env.UPSTASH_REDIS_REST_TOKEN);
 const USE_REDIS = Boolean(REDIS_URL && REDIS_TOKEN);
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const redisKey = (filePath) => `betbot:${path.basename(filePath, ".json")}`;
 
 async function redisCmd(cmd) {
-    const r = await fetch(REDIS_URL, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${REDIS_TOKEN}`, "Content-Type": "application/json" },
-        body: JSON.stringify(cmd),
-    });
+    let r;
+    try {
+        r = await fetch(REDIS_URL, {
+            method: "POST",
+            headers: { Authorization: `Bearer ${REDIS_TOKEN}`, "Content-Type": "application/json" },
+            body: JSON.stringify(cmd),
+        });
+    } catch (e) {
+        const c = e.cause ? (e.cause.code || e.cause.message) : "";
+        let hint = "";
+        try { const u = new URL(REDIS_URL); hint = ` [url: ${u.protocol}//${u.hostname}]`; } catch (_) { hint = " [url: INVALID FORMAT]"; }
+        throw new Error(`${e.message}${c ? " (" + c + ")" : ""}${hint}`);
+    }
     const j = await r.json().catch(() => ({}));
     if (!r.ok || j.error) throw new Error(j.error || `HTTP ${r.status}`);
     return j.result;
