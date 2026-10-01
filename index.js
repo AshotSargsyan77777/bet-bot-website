@@ -32,19 +32,71 @@ process.on("unhandledRejection", (e) => console.error("unhandledRejection:", e &
 const app = express();
 app.use(express.json({ limit: "2mb" }));
 
-// ================= ՖԱՅԼԵՐ =================
-function loadData(filePath, defaultValue) {
+// ================= ՊԱՀՈՑ (Upstash Redis, հակառակ դեպքում՝ ֆայլեր) =================
+const REDIS_URL = (process.env.UPSTASH_REDIS_REST_URL || "").trim().replace(/\/+$/, "");
+const REDIS_TOKEN = (process.env.UPSTASH_REDIS_REST_TOKEN || "").trim();
+const USE_REDIS = Boolean(REDIS_URL && REDIS_TOKEN);
+
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const redisKey = (filePath) => `betbot:${path.basename(filePath, ".json")}`;
+
+async function redisCmd(cmd) {
+    const r = await fetch(REDIS_URL, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${REDIS_TOKEN}`, "Content-Type": "application/json" },
+        body: JSON.stringify(cmd),
+    });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok || j.error) throw new Error(j.error || `HTTP ${r.status}`);
+    return j.result;
+}
+
+function readFileData(filePath, defaultValue) {
     try { if (fs.existsSync(filePath)) return JSON.parse(fs.readFileSync(filePath, "utf8")); }
     catch (e) { console.error("Error loading file:", filePath, e.message); }
     return defaultValue;
 }
+
+// Բեռնում. Redis-ի սխալի դեպքում ՉԵՆՔ օգտագործում default (որ լավ տվյալները չվերագրվեն), այլ կանգնում ենք
+async function loadData(filePath, defaultValue) {
+    if (!USE_REDIS) return readFileData(filePath, defaultValue);
+    const key = redisKey(filePath);
+    let lastErr;
+    for (let i = 0; i < 5; i++) {
+        try {
+            const raw = await redisCmd(["GET", key]);
+            if (raw !== null && raw !== undefined) return JSON.parse(raw);
+            const v = readFileData(filePath, defaultValue); // բազայում դեռ չկա՝ ֆայլից կամ default
+            await redisCmd(["SET", key, JSON.stringify(v)]);
+            return v;
+        } catch (e) {
+            lastErr = e;
+            console.error(`Redis load retry ${i + 1} (${key}):`, e.message);
+            await sleep(2000);
+        }
+    }
+    throw new Error(`Redis load failed for ${key}: ${lastErr && lastErr.message}`);
+}
+
+const writeChains = {};
 function saveData(filePath, data) {
-    try {
+    const json = JSON.stringify(data, null, 2);
+    try { // տեղային պահուստ
         fs.mkdirSync(path.dirname(filePath), { recursive: true });
         const tmp = filePath + ".tmp";
-        fs.writeFileSync(tmp, JSON.stringify(data, null, 2));
+        fs.writeFileSync(tmp, json);
         fs.renameSync(tmp, filePath);
     } catch (e) { console.error("Error saving file:", filePath, e.message); }
+
+    if (USE_REDIS) {
+        const key = redisKey(filePath);
+        writeChains[key] = (writeChains[key] || Promise.resolve()).then(async () => {
+            for (let i = 0; i < 3; i++) {
+                try { await redisCmd(["SET", key, json]); return; }
+                catch (e) { console.error(`Redis save retry ${i + 1} (${key}):`, e.message); await sleep(1500); }
+            }
+        });
+    }
 }
 const isAdmin = (id) => ADMIN_IDS.includes(Number(id));
 
@@ -53,12 +105,7 @@ function todayYerevan() {
 }
 
 // ================= ՏՎՅԱԼՆԵՐ =================
-let subscribers = loadData(SUBS_FILE, {});
-let vipSubscribers = loadData(VIP_FILE, {});
-let usedPromos = loadData(PROMO_FILE, []);
-let settings = loadData(SETTINGS_FILE, { currentPromo: "SHOT5", promoCount: 0, checksDate: null });
-
-let activeChecks = loadData(CHECKS_FILE, {
+const defaultChecks = () => ({
     standard_3x:   `Այսօրվա x3 չեկը ${DEFAULT_TEXT}`,
     standard_5x:   `Այսօրվա x5 չեկը ${DEFAULT_TEXT}`,
     standard_10x:  `Այսօրվա x10 չեկը ${DEFAULT_TEXT}`,
@@ -68,6 +115,22 @@ let activeChecks = loadData(CHECKS_FILE, {
     champions_10x: `Champions League x10 չեկը ${DEFAULT_TEXT}`,
     pkg_5:         `🎁 Պրոմո չեկը ${DEFAULT_TEXT}`,
 });
+const defaultSettings = () => ({ currentPromo: "SHOT5", promoCount: 0, checksDate: null });
+
+let subscribers = {};
+let vipSubscribers = {};
+let usedPromos = [];
+let settings = defaultSettings();
+let activeChecks = defaultChecks();
+
+async function initData() {
+    subscribers = await loadData(SUBS_FILE, {});
+    vipSubscribers = await loadData(VIP_FILE, {});
+    usedPromos = await loadData(PROMO_FILE, []);
+    settings = { ...defaultSettings(), ...(await loadData(SETTINGS_FILE, defaultSettings())) };
+    activeChecks = { ...defaultChecks(), ...(await loadData(CHECKS_FILE, defaultChecks())) };
+    console.log(`💾 Storage: ${USE_REDIS ? "Upstash Redis" : "local files (will be lost on restart)"}`);
+}
 
 const PACKAGES = {
     standard_3x:   { label: "Գործակից x3",  price: 2000 },
@@ -346,7 +409,7 @@ bot.onText(/^\/stats/, (msg) => {
     const ready = Object.keys(PACKAGES).filter((k) => k !== "pkg_vip" && isCheckReady(k));
     safeSend(
         msg.chat.id,
-        `📊 Վիճակագրություն\n🎟 Պրոմո՝ ${settings.currentPromo}\n👥 Պրոմո օգտագործողներ՝ ${settings.promoCount}\n✅ Չեկի բաժանորդներ՝ ${Object.keys(subscribers).length}\n👑 VIP բաժանորդներ՝ ${Object.keys(vipSubscribers).length}\n📅 Չեկերի ամսաթիվ՝ ${settings.checksDate || "—"}\n🟢 Պատրաստ՝ ${ready.join(", ") || "ոչ մեկը"}`,
+        `📊 Վիճակագրություն\n🎟 Պրոմո՝ ${settings.currentPromo}\n👥 Պրոմո օգտագործողներ՝ ${settings.promoCount}\n✅ Չեկի բաժանորդներ՝ ${Object.keys(subscribers).length}\n👑 VIP բաժանորդներ՝ ${Object.keys(vipSubscribers).length}\n📅 Չեկերի ամսաթիվ՝ ${settings.checksDate || "—"}\n💾 Պահոց՝ ${USE_REDIS ? "Redis (անվտանգ)" : "ֆայլ (կկորչի restart-ից հետո)"}\n🟢 Պատրաստ՝ ${ready.join(", ") || "ոչ մեկը"}`,
         MAIN_MENU
     );
 });
@@ -485,27 +548,33 @@ app.post("/internal/packages", authenticateSecret, (req, res) => {
 
 // ================= START =================
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, async () => {
-    console.log("🌐 Webhook server listening on port " + PORT);
-    if (!RENDER_URL) {
-        console.warn("⚠️ RENDER_EXTERNAL_URL not found — webhook not set automatically");
-        return;
-    }
-    try {
-        const r = await fetch(`https://api.telegram.org/bot${TOKEN}/setWebhook`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-                url: `${RENDER_URL}${WEBHOOK_PATH}`,
-                allowed_updates: ["message", "callback_query"],
-                drop_pending_updates: false,
-            }),
-        });
-        const j = await r.json();
-        console.log(j.ok ? "✅ Telegram webhook set (message + callback_query)" : "❌ setWebhook failed: " + j.description);
-    } catch (e) {
-        console.error("❌ Failed to set webhook:", e.message);
-    }
-});
+
+async function start() {
+    await initData();
+    app.listen(PORT, async () => {
+        console.log("🌐 Webhook server listening on port " + PORT);
+        if (!RENDER_URL) {
+            console.warn("⚠️ RENDER_EXTERNAL_URL not found — webhook not set automatically");
+            return;
+        }
+        try {
+            const r = await fetch(`https://api.telegram.org/bot${TOKEN}/setWebhook`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    url: `${RENDER_URL}${WEBHOOK_PATH}`,
+                    allowed_updates: ["message", "callback_query"],
+                    drop_pending_updates: false,
+                }),
+            });
+            const j = await r.json();
+            console.log(j.ok ? "✅ Telegram webhook set (message + callback_query)" : "❌ setWebhook failed: " + j.description);
+        } catch (e) {
+            console.error("❌ Failed to set webhook:", e.message);
+        }
+    });
+}
+
+start().catch((e) => { console.error("Startup failed:", e.message); process.exit(1); });
 
 console.log("🤖 Բոտը միացված է (webhook mode)...");
