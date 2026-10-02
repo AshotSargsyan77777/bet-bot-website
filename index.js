@@ -115,6 +115,18 @@ function todayYerevan() {
     return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Yerevan" }).format(new Date(Date.now() - 2 * 60 * 60 * 1000));
 }
 
+// ================= ԲԱԺԱՆՈՐԴԱԳՐՈՒԹՅՈՒՆ =================
+// Վճարովի չեկը վավեր է միայն գնման «օրվա» համար (02:00-ից 02:00). պրոմոն՝ մինչև admin-ը փոխի պրոմոկոդը.
+// Հին ձևաչափը (string) վճարովի փաթեթի համար համարվում է ժամկետանց, պրոմոյինը՝ ակտիվ.
+function getSub(chatId) {
+    const v = subscribers[chatId];
+    if (!v) return null;
+    if (typeof v === "string") return v === "pkg_5" ? { pkg: "pkg_5", date: null, text: null } : null;
+    if (!v.pkg || !PACKAGES[v.pkg]) return null;
+    if (v.pkg === "pkg_5") return v;
+    return v.date === todayYerevan() ? v : null;
+}
+
 // ================= ՏՎՅԱԼՆԵՐ =================
 const defaultChecks = () => ({
     standard_3x:   `Այսօրվա x3 չեկը ${DEFAULT_TEXT}`,
@@ -218,10 +230,11 @@ function buyButtons() {
 }
 
 function handleChecks(chatId) {
-    const key = subscribers[chatId];
+    const sub = getSub(chatId);
     let text = "📦 Ընտրեք փաթեթ՝";
-    if (key && PACKAGES[key]) {
-        text = `📊 Ձեր չեկը (${PACKAGES[key].label}):\n\n${getCheckText(key)}${DISCLAIMER}\n\n📦 Այլ փաթեթ գնելու համար՝`;
+    if (sub) {
+        const body = sub.pkg === "pkg_5" ? getCheckText("pkg_5") : (sub.text || getCheckText(sub.pkg));
+        text = `📊 Ձեր չեկը (${PACKAGES[sub.pkg].label}):\n\n${body}${DISCLAIMER}\n\n📦 Այլ փաթեթ գնելու համար՝`;
     }
     safeSend(chatId, text, { reply_markup: buyButtons() });
 }
@@ -244,7 +257,8 @@ bot.on("message", (msg) => {
     }
 
     if (text === "👤 Կարգավիճակ") {
-        const pkg = subscribers[chatId] ? PACKAGES[subscribers[chatId]] : null;
+        const sub = getSub(chatId);
+        const pkg = sub ? PACKAGES[sub.pkg] : null;
         let st = pkg ? `✅ Ակտիվ չեկ: ${pkg.label}` : "❌ Ակտիվ չեկ չունես:";
         if (vipSubscribers[chatId]) st += "\n👑 VIP Կանալ: Ակտիվ է";
         return safeSend(chatId, st, MAIN_MENU);
@@ -256,7 +270,7 @@ bot.on("message", (msg) => {
     }
 
     if (text === "🎁 Պրոմոկոդ") {
-        if (subscribers[chatId]) return safeSend(chatId, "✅ Դու արդեն ունես ակտիվ փաթեթ:", MAIN_MENU);
+        if (getSub(chatId)) return safeSend(chatId, "✅ Դու արդեն ունես ակտիվ փաթեթ:", MAIN_MENU);
         userStates.set(chatId, "AWAITING_PROMO");
         return safeSend(chatId, "🎁 Մուտքագրեք պրոմոկոդը․", BACK_MENU);
     }
@@ -280,7 +294,7 @@ bot.on("message", (msg) => {
                 safeSend(chatId, "❌ Արդեն օգտագործված է:", MAIN_MENU);
             } else {
                 usedPromos.push(chatId);
-                subscribers[chatId] = "pkg_5";
+                subscribers[chatId] = { pkg: "pkg_5", date: todayYerevan(), text: null };
                 settings.promoCount += 1;
                 saveData(SUBS_FILE, subscribers);
                 saveData(PROMO_FILE, usedPromos);
@@ -351,7 +365,8 @@ bot.onText(/\/approve (\d+) (\w+)/, (msg, match) => {
         if (!isCheckReady(pkgKey)) {
             return safeSend(msg.chat.id, `⚠️ ${pkgKey} չեկը այսօր պատրաստ չէ, վճարումը չհաստատվեց:`);
         }
-        subscribers[userId] = pkgKey;
+        // պահում ենք հենց այն չեկը, որի համար վճարել է (այսօրվա օրվա համար)
+        subscribers[userId] = { pkg: pkgKey, date: todayYerevan(), text: getCheckText(pkgKey) };
         saveData(SUBS_FILE, subscribers);
         safeSend(
             userId,
@@ -378,7 +393,10 @@ bot.onText(/\/setpromo (.+)/, (msg, match) => {
     settings.currentPromo = match[1].trim();
     settings.promoCount = 0;
     saveData(SETTINGS_FILE, settings);
-    for (const id in subscribers) { if (subscribers[id] === "pkg_5") delete subscribers[id]; }
+    for (const id in subscribers) {
+        const v = subscribers[id];
+        if (v === "pkg_5" || (v && v.pkg === "pkg_5")) delete subscribers[id];
+    }
     saveData(SUBS_FILE, subscribers);
     usedPromos = [];
     saveData(PROMO_FILE, usedPromos);
@@ -420,7 +438,7 @@ bot.onText(/^\/stats/, (msg) => {
     const ready = Object.keys(PACKAGES).filter((k) => k !== "pkg_vip" && isCheckReady(k));
     safeSend(
         msg.chat.id,
-        `📊 Վիճակագրություն\n🎟 Պրոմո՝ ${settings.currentPromo}\n👥 Պրոմո օգտագործողներ՝ ${settings.promoCount}\n✅ Չեկի բաժանորդներ՝ ${Object.keys(subscribers).length}\n👑 VIP բաժանորդներ՝ ${Object.keys(vipSubscribers).length}\n📅 Չեկերի ամսաթիվ՝ ${settings.checksDate || "—"}\n💾 Պահոց՝ ${USE_REDIS ? "Redis (անվտանգ)" : "ֆայլ (կկորչի restart-ից հետո)"}\n🟢 Պատրաստ՝ ${ready.join(", ") || "ոչ մեկը"}`,
+        `📊 Վիճակագրություն\n🎟 Պրոմո՝ ${settings.currentPromo}\n👥 Պրոմո օգտագործողներ՝ ${settings.promoCount}\n✅ Ակտիվ չեկ ունեցողներ՝ ${Object.keys(subscribers).filter((id) => getSub(id)).length}\n👑 VIP բաժանորդներ՝ ${Object.keys(vipSubscribers).length}\n📅 Չեկերի ամսաթիվ՝ ${settings.checksDate || "—"}\n💾 Պահոց՝ ${USE_REDIS ? "Redis (անվտանգ)" : "ֆայլ (կկորչի restart-ից հետո)"}\n🟢 Պատրաստ՝ ${ready.join(", ") || "ոչ մեկը"}`,
         MAIN_MENU
     );
 });
@@ -527,9 +545,6 @@ function formatPackage(pkg) {
     if (body.length > 3000) body = build(false); // Telegram-ի 4096 սահմանից պաշտպանություն
     const total = Number(pkg.combined_odds);
     let text = `⚽ GOALKING ՉԵԿ\n🎯 Ընդհանուր գործակից՝ ${Number.isFinite(total) ? total.toFixed(2) : pkg.combined_odds}x\n${LINE}\n\n${body}\n\n${LINE}`;
-    if (pkg.estimated_hit_chance !== undefined) {
-        text += `\n\n📈 Գնահատված հավանականություն՝ ~${pkg.estimated_hit_chance}% (գնահատական է, ոչ երաշխիք)`;
-    }
     if (pkg.quality === "stretch") text += "\n⚠️ Բարձր ռիսկի փաթեթ";
     else if (pkg.quality === "relaxed") text += "\n⚠️ Միջին ռիսկի փաթեթ";
     return text;
@@ -559,7 +574,10 @@ app.post("/internal/packages", authenticateSecret, (req, res) => {
         saveData(SETTINGS_FILE, settings);
 
         const readyList = N8N_KEYS.filter((k) => isCheckReady(k));
-        ADMIN_IDS.forEach((id) => safeSend(id, `🔄 n8n թարմացում (${settings.checksDate})\n🟢 Հասանելի՝ ${readyList.join(", ") || "ոչ մեկը"}`));
+        const chances = packages
+            .filter((p) => p.available && p.estimated_hit_chance !== undefined)
+            .map((p) => `${p.tier}_${p.package}: ~${p.estimated_hit_chance}%${p.quality && p.quality !== "strict" ? " (" + p.quality + ")" : ""}`);
+        ADMIN_IDS.forEach((id) => safeSend(id, `🔄 n8n թարմացում (${settings.checksDate})\n🟢 Հասանելի՝ ${readyList.join(", ") || "ոչ մեկը"}${chances.length ? "\n📈 Գնահատված հավանականություն (միայն admin)՝\n" + chances.join("\n") : ""}`));
 
         res.json({ ok: true, received: packages.length, available });
     } catch (err) {
