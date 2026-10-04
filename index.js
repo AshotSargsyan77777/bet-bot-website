@@ -13,6 +13,7 @@ const ADMIN_IDS = (process.env.ADMIN_ID || "").split(",").map(Number).filter(Boo
 const RENDER_URL = process.env.RENDER_EXTERNAL_URL;
 const DATA_DIR = process.env.DATA_DIR || "."; // Render-ում՝ Disk mount path, օր. /data
 const PROMO_FROM_3X = process.env.PROMO_FROM_3X === "1"; // 1 = պրոմո չեկը ավտոմատ = standard_3x
+const PROMOS_PER_UPDATE = Math.max(0, parseInt(process.env.PROMOS_PER_UPDATE || "1", 10)); // քանի պրոմո կոդ ստեղծել n8n-ի ամեն թարմացման հետ
 const VIP_CHANNEL_LINK = "https://t.me/+gbMtx2wt-UA4NGRi";
 
 if (!TOKEN) { console.error("BOT_TOKEN missing"); process.exit(1); }
@@ -651,10 +652,18 @@ app.post("/internal/packages", authenticateSecret, (req, res) => {
         const chances = packages
             .filter((p) => p.available && p.estimated_hit_chance !== undefined)
             .map((p) => `${p.tier}_${p.package}: ~${p.estimated_hit_chance}%${p.quality && p.quality !== "strict" ? " (" + p.quality + ")" : ""}`);
+        const newCodes = PROMOS_PER_UPDATE > 0 ? generatePromoCodes(PROMOS_PER_UPDATE) : [];
         (async () => {
             for (const id of ADMIN_IDS) {
                 await safeSend(id, `🔄 n8n թարմացում (${settings.checksDate})\n🟢 Հասանելի՝ ${readyList.join(", ") || "ոչ մեկը"}${chances.length ? "\n📈 Գնահատված հավանականություն (միայն admin)՝\n" + chances.join("\n") : ""}`);
                 await sendAllChecksToAdmin(id, false);
+                if (newCodes.length) {
+                    await bot.sendMessage(
+                        id,
+                        `🎁 Օրվա պրոմո կոդ${newCodes.length > 1 ? "եր" : ""} (մեկ օգտագործման, տալիս է x5 չեկ)՝\n\n${newCodes.map((c) => `<code>${c}</code>`).join("\n")}`,
+                        { parse_mode: "HTML" }
+                    ).catch((e) => console.error("promo send error:", e.message));
+                }
             }
         })();
 
