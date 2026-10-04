@@ -138,6 +138,7 @@ const defaultChecks = () => ({
     champions_3x:  `Champions League x3 չեկը ${DEFAULT_TEXT}`,
     champions_5x:  `Champions League x5 չեկը ${DEFAULT_TEXT}`,
     champions_10x: `Champions League x10 չեկը ${DEFAULT_TEXT}`,
+    promo_5x:      `🎁 Պրոմո չեկը ${DEFAULT_TEXT}`,
     pkg_5:         `🎁 Պրոմո չեկը ${DEFAULT_TEXT}`,
 });
 const defaultSettings = () => ({ currentPromo: "SHOT5", promoCount: 0, checksDate: null });
@@ -165,6 +166,7 @@ const PACKAGES = {
     champions_3x:  { label: "🏆 Champions League x3",  price: 2000 },
     champions_5x:  { label: "🏆 Champions League x5",  price: 3000 },
     champions_10x: { label: "🏆 Champions League x10", price: 7000 },
+    promo_5x: { label: "🎁 Պրոմո չեկ (մինչև x5)", price: 0 },
     pkg_vip: { label: "👑 VIP Կանալ", price: 5000 },
     pkg_5:   { label: "🎁 Պրոմո Փաթեթ", price: 0 },
 };
@@ -231,11 +233,7 @@ function buyButtons() {
     };
 }
 
-function handleChecks(chatId) {
-    if (isAdmin(chatId)) {
-        sendAllChecksToAdmin(chatId).then(() => safeSend(chatId, "ℹ️ Գնման կոճակների թեստի համար՝ /buy"));
-        return;
-    }
+function sendUserCheck(chatId) {
     const sub = getSub(chatId);
     let text = "📦 Ընտրեք փաթեթ՝";
     if (sub) {
@@ -245,9 +243,17 @@ function handleChecks(chatId) {
     safeSend(chatId, text, { reply_markup: buyButtons() });
 }
 
-// ================= ՊՐՈՄՈ ԿՈԴԵՐ (պատահական, 5 նիշ, յուրաքանչյուրը՝ մեկ օգտագործման, տալիս է x5 չեկ) =================
+function handleChecks(chatId) {
+    if (isAdmin(chatId)) {
+        sendAllChecksToAdmin(chatId).then(() => safeSend(chatId, "ℹ️ Գնման կոճակների թեստի համար՝ /buy"));
+        return;
+    }
+    sendUserCheck(chatId);
+}
+
+// ================= ՊՐՈՄՈ ԿՈԴԵՐ (պատահական, 5 նիշ, յուրաքանչյուրը՝ մեկ օգտագործման, տալիս է առանձին պրոմո չեկ՝ մինչև x5) =================
 const PROMO_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // առանց 0/O/1/I
-const PROMO_PACKAGES = ["standard_5x", "champions_5x"];     // ինչ չեկ է տրվում պրոմոյով (առաջին պատրաստը)
+const PROMO_PACKAGES = ["promo_5x"];                         // պրոմոյով տրվում է առանձին պրոմո չեկը (մինչև x5), ոչ թե վճարովին
 
 function generatePromoCodes(n) {
     const out = [];
@@ -275,7 +281,7 @@ async function sendAllChecksToAdmin(chatId, withHeader = true) {
         await safeSend(chatId, `📋 Պատրաստ չեկեր՝ ${ready.length} (${settings.checksDate || "—"})${notReady.length ? "\n⛔ Հասանելի չեն՝ " + notReady.join(", ") : ""}`);
     }
     for (const k of ready) {
-        await safeSend(chatId, `📦 ${k} — ${PACKAGES[k].label} (${PACKAGES[k].price.toLocaleString("en-US")} դրամ)\n\n${activeChecks[k]}`);
+        await safeSend(chatId, `📦 ${k} — ${PACKAGES[k].label} (${PACKAGES[k].price ? PACKAGES[k].price.toLocaleString("en-US") + " դրամ" : "անվճար պրոմո"})\n\n${activeChecks[k]}`);
     }
 }
 
@@ -344,7 +350,7 @@ bot.on("message", (msg) => {
         saveData(PROMO_CODES_FILE, promoCodes);
         saveData(SUBS_FILE, subscribers);
         safeSend(chatId, "🎉 Պրոմոկոդը ակտիվացվեց!", MAIN_MENU);
-        handleChecks(chatId);
+        sendUserCheck(chatId);
         ADMIN_IDS.forEach((id) => safeSend(id, `🎁 ${user} (ID: ${chatId}) ակտիվացրեց պրոմո ${code} (${key})`));
         return;
     }
@@ -359,7 +365,7 @@ bot.on("callback_query", async (query) => {
         const chatId = query.message.chat.id.toString();
         const user = query.from.username ? `@${query.from.username}` : query.from.first_name;
         const pkgKey = String(query.data || "").replace("buy_", "");
-        if (!PACKAGES[pkgKey] || pkgKey === "pkg_5") return;
+        if (!PACKAGES[pkgKey] || pkgKey === "pkg_5" || pkgKey === "promo_5x") return;
 
         if (pkgKey !== "pkg_vip" && !isCheckReady(pkgKey)) {
             await safeSend(chatId, "❌ Այս չեկը այսօր հասանելի չէ:");
@@ -434,7 +440,7 @@ bot.onText(/^\/genpromo(?:\s+(\d+))?/, (msg, match) => {
     const codes = generatePromoCodes(n);
     bot.sendMessage(
         msg.chat.id,
-        `🎁 ${n} նոր պրոմո կոդ (մեկ օգտագործման, տալիս է x5 չեկ).\n\n${codes.map((c) => `<code>${c}</code>`).join("\n")}`,
+        `🎁 ${n} նոր պրոմո կոդ (մեկ օգտագործման, տալիս է առանձին պրոմո չեկ՝ մինչև x5).\n\n${codes.map((c) => `<code>${c}</code>`).join("\n")}`,
         { parse_mode: "HTML" }
     ).catch((e) => console.error("genpromo send error:", e.message));
     syncAdmins(`🎁 Ադմին ${msg.from.first_name}-ը ստեղծեց ${n} պրոմո կոդ`, msg.chat.id);
@@ -466,7 +472,7 @@ bot.onText(/^\/admin/, (msg) => {
     safeSend(msg.chat.id, [
         "🛠 Admin հրամաններ",
         "/allchecks — բոլոր պատրաստ չեկերը",
-        "/genpromo [N] — N պատահական 5-նիշ պրոմո կոդ (կանխադրված 1, առավելագույնը 50)",
+        "/genpromo [N] — N պատահական 5-նիշ պրոմո կոդ (կանխադրված 1, առավելագույնը 50), տալիս է պրոմո չեկ՝ մինչև x5",
         "/promos — ազատ/օգտագործված պրոմոներ",
         "/stats — վիճակագրություն",
         "/viewcheck <package> — մեկ չեկ",
@@ -660,7 +666,7 @@ app.post("/internal/packages", authenticateSecret, (req, res) => {
                 if (newCodes.length) {
                     await bot.sendMessage(
                         id,
-                        `🎁 Օրվա պրոմո կոդ${newCodes.length > 1 ? "եր" : ""} (մեկ օգտագործման, տալիս է x5 չեկ)՝\n\n${newCodes.map((c) => `<code>${c}</code>`).join("\n")}`,
+                        `🎁 Օրվա պրոմո կոդ${newCodes.length > 1 ? "եր" : ""} (մեկ օգտագործման, տալիս է առանձին պրոմո չեկ՝ մինչև x5)՝\n\n${newCodes.map((c) => `<code>${c}</code>`).join("\n")}`,
                         { parse_mode: "HTML" }
                     ).catch((e) => console.error("promo send error:", e.message));
                 }
