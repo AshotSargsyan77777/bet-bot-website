@@ -2,6 +2,7 @@ const TelegramBot = require("node-telegram-bot-api");
 const fs = require("fs");
 const path = require("path");
 const express = require("express");
+const crypto = require("crypto");
 require("dotenv").config();
 
 // ================= ԿՈՆՖԻԳՈՒՐԱՑԻԱ =================
@@ -17,7 +18,7 @@ const VIP_CHANNEL_LINK = "https://t.me/+gbMtx2wt-UA4NGRi";
 if (!TOKEN) { console.error("BOT_TOKEN missing"); process.exit(1); }
 
 const SUBS_FILE = path.join(DATA_DIR, "subscribers.json");
-const PROMO_FILE = path.join(DATA_DIR, "used_promos.json");
+const PROMO_CODES_FILE = path.join(DATA_DIR, "promo_codes.json");
 const CHECKS_FILE = path.join(DATA_DIR, "active_checks.json");
 const SETTINGS_FILE = path.join(DATA_DIR, "settings.json");
 const VIP_FILE = path.join(DATA_DIR, "vip_subscribers.json");
@@ -142,14 +143,14 @@ const defaultSettings = () => ({ currentPromo: "SHOT5", promoCount: 0, checksDat
 
 let subscribers = {};
 let vipSubscribers = {};
-let usedPromos = [];
+let promoCodes = {}; // { CODE: { created, usedBy, usedAt } }
 let settings = defaultSettings();
 let activeChecks = defaultChecks();
 
 async function initData() {
     subscribers = await loadData(SUBS_FILE, {});
     vipSubscribers = await loadData(VIP_FILE, {});
-    usedPromos = await loadData(PROMO_FILE, []);
+    promoCodes = await loadData(PROMO_CODES_FILE, {});
     settings = { ...defaultSettings(), ...(await loadData(SETTINGS_FILE, defaultSettings())) };
     activeChecks = { ...defaultChecks(), ...(await loadData(CHECKS_FILE, defaultChecks())) };
     console.log(`💾 Storage: ${USE_REDIS ? "Upstash Redis" : "local files (will be lost on restart)"}`);
@@ -230,6 +231,10 @@ function buyButtons() {
 }
 
 function handleChecks(chatId) {
+    if (isAdmin(chatId)) {
+        sendAllChecksToAdmin(chatId).then(() => safeSend(chatId, "ℹ️ Գնման կոճակների թեստի համար՝ /buy"));
+        return;
+    }
     const sub = getSub(chatId);
     let text = "📦 Ընտրեք փաթեթ՝";
     if (sub) {
@@ -237,6 +242,40 @@ function handleChecks(chatId) {
         text = `📊 Ձեր չեկը (${PACKAGES[sub.pkg].label}):\n\n${body}${DISCLAIMER}\n\n📦 Այլ փաթեթ գնելու համար՝`;
     }
     safeSend(chatId, text, { reply_markup: buyButtons() });
+}
+
+// ================= ՊՐՈՄՈ ԿՈԴԵՐ (պատահական, 5 նիշ, յուրաքանչյուրը՝ մեկ օգտագործման, տալիս է x5 չեկ) =================
+const PROMO_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // առանց 0/O/1/I
+const PROMO_PACKAGES = ["standard_5x", "champions_5x"];     // ինչ չեկ է տրվում պրոմոյով (առաջին պատրաստը)
+
+function generatePromoCodes(n) {
+    const out = [];
+    while (out.length < n) {
+        let c = "";
+        for (let i = 0; i < 5; i++) c += PROMO_ALPHABET[crypto.randomInt(PROMO_ALPHABET.length)];
+        if (promoCodes[c]) continue;
+        promoCodes[c] = { created: todayYerevan(), usedBy: null, usedAt: null };
+        out.push(c);
+    }
+    saveData(PROMO_CODES_FILE, promoCodes);
+    return out;
+}
+const promoCounts = () => {
+    const all = Object.values(promoCodes);
+    const used = all.filter((v) => v.usedBy).length;
+    return { free: all.length - used, used };
+};
+
+// ================= ԱԴՄԻՆԻՆ՝ ԲՈԼՈՐ ՊԱՏՐԱՍՏ ՉԵԿԵՐԸ =================
+async function sendAllChecksToAdmin(chatId, withHeader = true) {
+    const ready = N8N_KEYS.filter(isCheckReady);
+    const notReady = N8N_KEYS.filter((k) => !isCheckReady(k));
+    if (withHeader) {
+        await safeSend(chatId, `📋 Պատրաստ չեկեր՝ ${ready.length} (${settings.checksDate || "—"})${notReady.length ? "\n⛔ Հասանելի չեն՝ " + notReady.join(", ") : ""}`);
+    }
+    for (const k of ready) {
+        await safeSend(chatId, `📦 ${k} — ${PACKAGES[k].label} (${PACKAGES[k].price.toLocaleString("en-US")} դրամ)\n\n${activeChecks[k]}`);
+    }
 }
 
 // ================= ՀԱՂՈՐԴԱԳՐՈՒԹՅՈՒՆՆԵՐ =================
@@ -288,25 +327,25 @@ bot.on("message", (msg) => {
     }
 
     if (userStates.get(chatId) === "AWAITING_PROMO") {
-        const inputCode = text.trim().toUpperCase();
-        if (inputCode === String(settings.currentPromo).toUpperCase()) {
-            if (usedPromos.includes(chatId)) {
-                safeSend(chatId, "❌ Արդեն օգտագործված է:", MAIN_MENU);
-            } else {
-                usedPromos.push(chatId);
-                subscribers[chatId] = { pkg: "pkg_5", date: todayYerevan(), text: null };
-                settings.promoCount += 1;
-                saveData(SUBS_FILE, subscribers);
-                saveData(PROMO_FILE, usedPromos);
-                saveData(SETTINGS_FILE, settings);
-                safeSend(chatId, "🎉 Պրոմոկոդը ակտիվացվեց!", MAIN_MENU);
-                handleChecks(chatId);
-                ADMIN_IDS.forEach((id) => safeSend(id, `✅ ${user} (ID: ${chatId}) ակտիվացրեց պրոմոկոդը`));
-            }
-        } else {
-            safeSend(chatId, "❌ Սխալ կոդ:", BACK_MENU);
-        }
+        const code = text.trim().toUpperCase().replace(/[\s-]/g, "");
         userStates.delete(chatId);
+        const entry = promoCodes[code];
+        if (!entry) return safeSend(chatId, "❌ Սխալ կոդ:", MAIN_MENU);
+        if (entry.usedBy) return safeSend(chatId, "❌ Այս կոդն արդեն օգտագործված է:", MAIN_MENU);
+        if (getSub(chatId)) return safeSend(chatId, "✅ Դու արդեն ունես ակտիվ փաթեթ:", MAIN_MENU);
+
+        const key = PROMO_PACKAGES.find((k) => isCheckReady(k));
+        if (!key) return safeSend(chatId, "⏳ Պրոմո չեկը այսօր դեռ պատրաստ չէ, փորձեք ավելի ուշ (կոդը չի ծախսվել):", MAIN_MENU);
+
+        entry.usedBy = chatId;
+        entry.usedAt = new Date().toISOString();
+        subscribers[chatId] = { pkg: key, date: todayYerevan(), text: getCheckText(key), promo: true };
+        saveData(PROMO_CODES_FILE, promoCodes);
+        saveData(SUBS_FILE, subscribers);
+        safeSend(chatId, "🎉 Պրոմոկոդը ակտիվացվեց!", MAIN_MENU);
+        handleChecks(chatId);
+        ADMIN_IDS.forEach((id) => safeSend(id, `🎁 ${user} (ID: ${chatId}) ակտիվացրեց պրոմո ${code} (${key})`));
+        return;
     }
 });
 
@@ -388,21 +427,56 @@ bot.onText(/\/reject (\d+)/, (msg, match) => {
     syncAdmins(`❌ Ադմին ${msg.from.first_name}-ը մերժեց ${userId}-ի վճարումը`, msg.chat.id);
 });
 
-bot.onText(/\/setpromo (.+)/, (msg, match) => {
+bot.onText(/^\/genpromo(?:\s+(\d+))?/, (msg, match) => {
     if (!isAdmin(msg.chat.id)) return;
-    settings.currentPromo = match[1].trim();
-    settings.promoCount = 0;
-    saveData(SETTINGS_FILE, settings);
-    for (const id in subscribers) {
-        const v = subscribers[id];
-        if (v === "pkg_5" || (v && v.pkg === "pkg_5")) delete subscribers[id];
-    }
-    saveData(SUBS_FILE, subscribers);
-    usedPromos = [];
-    saveData(PROMO_FILE, usedPromos);
-    safeSend(msg.chat.id, `✅ Նոր պրոմո՝ ${settings.currentPromo.toUpperCase()}`);
-    syncAdmins(`🆕 Ադմին ${msg.from.first_name}-ը փոխեց պրոմոկոդը՝ ${settings.currentPromo.toUpperCase()}`, msg.chat.id);
+    const n = Math.min(Math.max(parseInt(match[1] || "1", 10), 1), 50);
+    const codes = generatePromoCodes(n);
+    bot.sendMessage(
+        msg.chat.id,
+        `🎁 ${n} նոր պրոմո կոդ (մեկ օգտագործման, տալիս է x5 չեկ).\n\n${codes.map((c) => `<code>${c}</code>`).join("\n")}`,
+        { parse_mode: "HTML" }
+    ).catch((e) => console.error("genpromo send error:", e.message));
+    syncAdmins(`🎁 Ադմին ${msg.from.first_name}-ը ստեղծեց ${n} պրոմո կոդ`, msg.chat.id);
 });
+
+bot.onText(/^\/promos/, (msg) => {
+    if (!isAdmin(msg.chat.id)) return;
+    const { free, used } = promoCounts();
+    const freeList = Object.entries(promoCodes).filter(([, v]) => !v.usedBy).map(([c]) => c).slice(0, 100);
+    bot.sendMessage(
+        msg.chat.id,
+        `🎁 Պրոմո կոդեր. ազատ՝ ${free}, օգտագործված՝ ${used}${freeList.length ? "\n\n" + freeList.map((c) => `<code>${c}</code>`).join("\n") : ""}`,
+        { parse_mode: "HTML" }
+    ).catch((e) => console.error("promos send error:", e.message));
+});
+
+bot.onText(/^\/allchecks/, (msg) => {
+    if (!isAdmin(msg.chat.id)) return;
+    sendAllChecksToAdmin(msg.chat.id);
+});
+
+bot.onText(/^\/buy/, (msg) => {
+    if (!isAdmin(msg.chat.id)) return;
+    safeSend(msg.chat.id, "📦 Ընտրեք փաթեթ՝", { reply_markup: buyButtons() });
+});
+
+bot.onText(/^\/admin/, (msg) => {
+    if (!isAdmin(msg.chat.id)) return;
+    safeSend(msg.chat.id, [
+        "🛠 Admin հրամաններ",
+        "/allchecks — բոլոր պատրաստ չեկերը",
+        "/genpromo [N] — N պատահական 5-նիշ պրոմո կոդ (կանխադրված 1, առավելագույնը 50)",
+        "/promos — ազատ/օգտագործված պրոմոներ",
+        "/stats — վիճակագրություն",
+        "/viewcheck <package> — մեկ չեկ",
+        "/setcheck <package> <տեքստ> — ձեռքով չեկ",
+        "/approve <ID> <package> — հաստատել վճարում",
+        "/reject <ID> — մերժել",
+        "/reply <ID> <տեքստ> — պատասխան user-ին",
+        "/buy — գնման կոճակներ (թեստ)",
+    ].join("\n"));
+});
+
 
 bot.onText(/\/setcheck\s+(\w+)\s+([\s\S]+)/, (msg, match) => {
     if (!isAdmin(msg.chat.id)) return;
@@ -438,7 +512,7 @@ bot.onText(/^\/stats/, (msg) => {
     const ready = Object.keys(PACKAGES).filter((k) => k !== "pkg_vip" && isCheckReady(k));
     safeSend(
         msg.chat.id,
-        `📊 Վիճակագրություն\n🎟 Պրոմո՝ ${settings.currentPromo}\n👥 Պրոմո օգտագործողներ՝ ${settings.promoCount}\n✅ Ակտիվ չեկ ունեցողներ՝ ${Object.keys(subscribers).filter((id) => getSub(id)).length}\n👑 VIP բաժանորդներ՝ ${Object.keys(vipSubscribers).length}\n📅 Չեկերի ամսաթիվ՝ ${settings.checksDate || "—"}\n💾 Պահոց՝ ${USE_REDIS ? "Redis (անվտանգ)" : "ֆայլ (կկորչի restart-ից հետո)"}\n🟢 Պատրաստ՝ ${ready.join(", ") || "ոչ մեկը"}`,
+        `📊 Վիճակագրություն\n🎁 Պրոմո կոդեր՝ ազատ ${promoCounts().free}, օգտագործված ${promoCounts().used}\n✅ Ակտիվ չեկ ունեցողներ՝ ${Object.keys(subscribers).filter((id) => getSub(id)).length}\n👑 VIP բաժանորդներ՝ ${Object.keys(vipSubscribers).length}\n📅 Չեկերի ամսաթիվ՝ ${settings.checksDate || "—"}\n💾 Պահոց՝ ${USE_REDIS ? "Redis (անվտանգ)" : "ֆայլ (կկորչի restart-ից հետո)"}\n🟢 Պատրաստ՝ ${ready.join(", ") || "ոչ մեկը"}`,
         MAIN_MENU
     );
 });
@@ -577,7 +651,12 @@ app.post("/internal/packages", authenticateSecret, (req, res) => {
         const chances = packages
             .filter((p) => p.available && p.estimated_hit_chance !== undefined)
             .map((p) => `${p.tier}_${p.package}: ~${p.estimated_hit_chance}%${p.quality && p.quality !== "strict" ? " (" + p.quality + ")" : ""}`);
-        ADMIN_IDS.forEach((id) => safeSend(id, `🔄 n8n թարմացում (${settings.checksDate})\n🟢 Հասանելի՝ ${readyList.join(", ") || "ոչ մեկը"}${chances.length ? "\n📈 Գնահատված հավանականություն (միայն admin)՝\n" + chances.join("\n") : ""}`));
+        (async () => {
+            for (const id of ADMIN_IDS) {
+                await safeSend(id, `🔄 n8n թարմացում (${settings.checksDate})\n🟢 Հասանելի՝ ${readyList.join(", ") || "ոչ մեկը"}${chances.length ? "\n📈 Գնահատված հավանականություն (միայն admin)՝\n" + chances.join("\n") : ""}`);
+                await sendAllChecksToAdmin(id, false);
+            }
+        })();
 
         res.json({ ok: true, received: packages.length, available });
     } catch (err) {
