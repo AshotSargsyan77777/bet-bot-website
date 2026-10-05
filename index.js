@@ -114,7 +114,7 @@ const isAdmin = (id) => ADMIN_IDS.includes(Number(id));
 
 // «Օրը» սկսվում է Yerevan ժամանակով 02:00-ին (02:00-ից մինչև հաջորդ օրվա 02:00), ինչպես n8n-ի խաղերի պատուհանը
 function todayYerevan() {
-    return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Yerevan" }).format(new Date(Date.now() - 12 * 60 * 60 * 1000));
+    return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Yerevan" }).format(new Date(Date.now() - 2 * 60 * 60 * 1000));
 }
 
 // ================= ԲԱԺԱՆՈՐԴԱԳՐՈՒԹՅՈՒՆ =================
