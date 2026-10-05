@@ -555,12 +555,12 @@ function explainSelection(s) {
     if (s.market === "BTTS") {
         if (!xg) return "";
         if (/Yes$/i.test(sel)) {
-            return `Երկու թիմի վերջին խաղերի ցուցանիշներով էլ ակնկալվում են գոլեր (${xg[0]} և ${xg[1]}), ուստի երկուսի գոլ խփելը հավանական է։`;
+            return `Երկու թիմի շուկայի և թիմերի ցուցանիշներով էլ ակնկալվում են գոլեր (${xg[0]} և ${xg[1]}), ուստի երկուսի գոլ խփելը հավանական է։`;
         }
         const weakIsHome = xg[0] <= xg[1];
         const weakName = weakIsHome ? homeName : awayName;
         const weakXg = weakIsHome ? xg[0] : xg[1];
-        return `${weakName}-ի հարձակումը վերջին խաղերի ցուցանիշներով թույլ է (ակնկալվում է ընդամենը ${weakXg} գոլ), ուստի երկուսի գոլ խփելը քիչ հավանական է։`;
+        return `${weakName}-ի հարձակումը շուկայի և թիմերի ցուցանիշներով թույլ է (ակնկալվում է ընդամենը ${weakXg} գոլ), ուստի երկուսի գոլ խփելը քիչ հավանական է։`;
     }
 
     if (s.market === "OU") {
@@ -569,6 +569,44 @@ function explainSelection(s) {
         return /over/i.test(sel)
             ? `Ակնկալվում է գոլային խաղ՝ ընդհանուր մոտ ${xgTotal[0]} գոլ (գիծը՝ ${lm[1]})։`
             : `Ակնկալվում է փակ խաղ՝ ընդհանուր մոտ ${xgTotal[0]} գոլ, ինչը ${lm[1]}-ից ցածր է։`;
+    }
+
+    if (s.market === "TEAM_TOTAL_HOME" || s.market === "TEAM_TOTAL_AWAY") {
+        const isH = s.market === "TEAM_TOTAL_HOME";
+        const team = isH ? homeName : awayName;
+        const lm = sel.match(/(Over|Under)\s+(\d+(?:\.\d+)?)/i);
+        if (!xg || !lm) return "";
+        const tx = isH ? xg[0] : xg[1];
+        return /over/i.test(lm[1])
+            ? `${team}-ի ակնկալվող գոլերը՝ ${tx} (գիծը՝ ${lm[2]})։`
+            : `${team}-ի հարձակումը սահմանափակ է (ակնկալվում է ~${tx} գոլ), ուստի ${lm[2]} գիծը հավանաբար չի գերազանցվի։`;
+    }
+
+    if (s.market === "OU_1H") {
+        const lm = sel.match(/(?:Over|Under)\s+(\d+(?:\.\d+)?)/i);
+        if (!xgTotal || !lm) return "";
+        return `Առաջին խաղակեսում ակնկալվում է մոտ ${(xgTotal[0] * 0.45).toFixed(2)} գոլ (գիծը՝ ${lm[1]})։`;
+    }
+
+    if (s.market === "CLEAN_SHEET_HOME" || s.market === "CLEAN_SHEET_AWAY" || s.market === "WIN_TO_NIL_HOME" || s.market === "WIN_TO_NIL_AWAY") {
+        const isH = /_HOME$/.test(s.market);
+        const team = isH ? homeName : awayName;
+        const opp = isH ? awayName : homeName;
+        if (!xg) return "";
+        const ox = isH ? xg[1] : xg[0];
+        const yes = /Yes$/i.test(sel);
+        return yes
+            ? `${opp}-ի ակնկալվող գոլերը ցածր են (${ox}), ուստի ${team}-ը կարող է մնալ առանց բաց թողնված գոլի։`
+            : `${opp}-ից ակնկալվում է ~${ox} գոլ, ուստի ${team}-ի դարպասը անխախտ մնալը քիչ հավանական է։`;
+    }
+
+    if (s.market === "ODD_EVEN") {
+        return p !== null ? `Մոդելը այս ելքին տալիս է ~${p}% հավանականություն։` : "";
+    }
+
+    if (s.market === "DNB") {
+        const name = sel.replace(/^Draw No Bet\s*—\s*/, "");
+        return `Ոչ-ոքիի դեպքում գումարը վերադարձվում է, ուստի ${name}-ը չպարտվելու դեպքում ռիսկը փոքր է։`;
     }
 
     if (s.market === "MATCH_WINNER" || s.market === "DOUBLE_CHANCE") {
@@ -603,7 +641,11 @@ function explainSelection(s) {
 }
 
 const NUM_EMOJI = ["1️⃣", "2️⃣", "3️⃣", "4️⃣", "5️⃣", "6️⃣", "7️⃣", "8️⃣", "9️⃣", "🔟"];
-const MARKET_EMOJI = { MATCH_WINNER: "🏆", DOUBLE_CHANCE: "🛡", BTTS: "🥅", OU: "⚽" };
+const MARKET_EMOJI = {
+    MATCH_WINNER: "🏆", DOUBLE_CHANCE: "🛡", DNB: "🏆", BTTS: "🥅", OU: "⚽",
+    TEAM_TOTAL_HOME: "⚽", TEAM_TOTAL_AWAY: "⚽", OU_1H: "⏱", ODD_EVEN: "🔢",
+    CLEAN_SHEET_HOME: "🧤", CLEAN_SHEET_AWAY: "🧤", WIN_TO_NIL_HOME: "💪", WIN_TO_NIL_AWAY: "💪",
+};
 const LINE = "━━━━━━━━━━━━━━";
 
 function formatPackage(pkg) {
@@ -626,6 +668,8 @@ function formatPackage(pkg) {
     if (body.length > 3000) body = build(false); // Telegram-ի 4096 սահմանից պաշտպանություն
     const total = Number(pkg.combined_odds);
     let text = `⚽ GOALKING ՉԵԿ\n🎯 Ընդհանուր գործակից՝ ${Number.isFinite(total) ? total.toFixed(2) : pkg.combined_odds}x\n${LINE}\n\n${body}\n\n${LINE}`;
+    const bks = [...new Set(pkg.selections.map((x) => x.bookmaker).filter(Boolean))];
+    if (bks.length === 1) text += `\nℹ️ Գործակիցները՝ ${bks[0]}`;
     if (pkg.quality === "stretch") text += "\n⚠️ Բարձր ռիսկի փաթեթ";
     else if (pkg.quality === "relaxed") text += "\n⚠️ Միջին ռիսկի փաթեթ";
     return text;
