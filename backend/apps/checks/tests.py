@@ -1,6 +1,7 @@
 from django.test import SimpleTestCase, override_settings
 from rest_framework.test import APITestCase
 
+from apps.checks.constants import PACKAGES
 from apps.checks.models import AppSettings, DailyCheck
 from apps.checks.services.formatting import format_package
 from apps.checks.services.time import yerevan_today
@@ -46,7 +47,7 @@ class WebhookAndCatalogTests(APITestCase):
         )
 
     def test_seeded_defaults(self):
-        self.assertEqual(DailyCheck.objects.count(), 10)
+        self.assertEqual(DailyCheck.objects.count(), len(PACKAGES))
 
     def test_webhook_auth_and_validation(self):
         self.assertEqual(self.post_packages([PACKAGE], key="wrong").status_code, 401)
@@ -87,9 +88,60 @@ class WebhookAndCatalogTests(APITestCase):
         self.assertEqual(self.client.get("/api/admin/checks/").status_code, 403)
         self.client.force_authenticate(admin)
         r = self.client.get("/api/admin/checks/")
-        self.assertEqual(len(r.data["checks"]), 10)
+        self.assertEqual(len(r.data["checks"]), len(PACKAGES))
         r = self.client.patch("/api/admin/checks/", {"package_key": "nope", "body_text": "x"}, format="json")
         self.assertEqual(r.status_code, 400)
         r = self.client.patch("/api/admin/checks/", {"package_key": "standard_10x", "body_text": "Manual check"}, format="json")
         self.assertEqual(r.status_code, 200)
         self.assertTrue(r.data["ready"])
+
+
+class ExplanationTests(SimpleTestCase):
+    BASE = ["xG 1.80/0.90", "xG total 2.70", "Form: home 80% vs away 40%", "H2H 3-1-1 in 5",
+            "Injuries: home 0 / away 2", "Corners exp 10.9 (home 5.6 / away 5.3)", "Cards exp 4.2 (home 2.0 / away 2.2)"]
+
+    def explain(self, market, selection, extra=()):
+        from apps.checks.services.formatting import explain_selection
+
+        return explain_selection({"fixture": "A - B", "market": market, "selection": selection,
+                                  "reasons": [*extra, *self.BASE]})
+
+    def test_every_market_has_short_explanation(self):
+        cases = [
+            ("MATCH_WINNER", "A (Home Win)"), ("DOUBLE_CHANCE", "B or Draw"), ("DNB", "Draw No Bet — A"),
+            ("BTTS", "Both Teams To Score - Yes"), ("BTTS", "Both Teams To Score - No"),
+            ("OU", "Over 2.5"), ("OU", "Under 3.5"), ("TEAM_TOTAL_HOME", "A Over 1.5 Goals"),
+            ("TEAM_TOTAL_AWAY", "B Under 1.5 Goals"), ("OU_1H", "1st Half Over 0.5"),
+            ("CLEAN_SHEET_HOME", "A Clean Sheet - Yes"), ("WIN_TO_NIL_AWAY", "B Win To Nil - No"),
+            ("CORNERS_OU", "Corners Over 9.5"), ("CORNERS_AWAY", "B Corners Over 4.5"), ("CARDS_OU", "Cards Under 4.5"),
+        ]
+        for market, selection in cases:
+            text = self.explain(market, selection)
+            self.assertTrue(text, (market, selection))
+            self.assertLessEqual(len(text), 90, (market, text))
+
+    def test_content(self):
+        self.assertIn("10.9", self.explain("CORNERS_OU", "Corners Over 9.5"))
+        self.assertIn("5.3", self.explain("CORNERS_AWAY", "B Corners Over 4.5"))
+        self.assertIn("4.2", self.explain("CARDS_OU", "Cards Over 3.5"))
+        ah = self.explain("ASIAN_HANDICAP", "A −1 (Asian Handicap)", ["AH −1: win 41%, push 22%"])
+        self.assertIn("41%", ah)
+        self.assertIn("22%", ah)
+        mw = self.explain("MATCH_WINNER", "A (Home Win)")
+        for fact in ("ձև", "3/5", "1.8"):
+            self.assertIn(fact, mw)
+        from apps.checks.services.formatting import explain_selection
+
+        injured = explain_selection({"fixture": "A - B", "market": "MATCH_WINNER", "selection": "A (Home Win)",
+                                     "reasons": ["xG 1.50/1.40", "Injuries: home 0 / away 2"]})
+        self.assertIn("2 բացակա", injured)
+
+    def test_package_shows_probability_row(self):
+        text = format_package({"combined_odds": 3.1, "selections": [
+            {"fixture": "A - B", "market": "CORNERS_OU", "selection": "Corners Over 9.5", "odd": 1.8,
+             "probability": 0.64, "reasons": self.BASE},
+            {"fixture": "C - D", "market": "CARDS_OU", "selection": "Cards Over 3.5", "odd": 1.7, "reasons": []},
+        ]})
+        self.assertIn("🚩", text)
+        self.assertIn("🟨", text)
+        self.assertIn("📊 Հավանականություն՝ 64%", text)

@@ -11,7 +11,10 @@ type Candidate = {
   active: boolean;
 };
 
-const MARKETS = ["MATCH_WINNER", "DOUBLE_CHANCE", "DNB", "BTTS", "OU", "TEAM_TOTAL_HOME", "TEAM_TOTAL_AWAY", "OU_1H", "ODD_EVEN"];
+const MARKETS = [
+  "MATCH_WINNER", "DOUBLE_CHANCE", "DNB", "ASIAN_HANDICAP", "BTTS", "OU", "TEAM_TOTAL_HOME", "TEAM_TOTAL_AWAY", "OU_1H",
+  "CORNERS_OU", "CORNERS_HOME", "CORNERS_AWAY", "CARDS_OU", "ODD_EVEN",
+];
 const empty = { fixture_name: "", market: "MATCH_WINNER", selection: "", odd: "" };
 
 export function CandidatesPanel() {

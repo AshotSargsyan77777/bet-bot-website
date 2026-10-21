@@ -5,6 +5,15 @@ const marketLabel: Record<string, string> = {
   BTTS: "🥅 Երկու գոլ",
   OU: "⚽ Գոլեր",
   DOUBLE_CHANCE: "🛡 Երկակի շանս",
+  DNB: "🏆 Ոչ-ոքի՝ վերադարձ",
+  TEAM_TOTAL_HOME: "⚽ Տան թիմի գոլեր",
+  TEAM_TOTAL_AWAY: "⚽ Հյուրի գոլեր",
+  OU_1H: "⏱ 1-ին խաղակես",
+  ASIAN_HANDICAP: "⚖️ Ասիական ֆորա",
+  CORNERS_OU: "🚩 Անկյունայիններ",
+  CORNERS_HOME: "🚩 Տան թիմի անկյունայիններ",
+  CORNERS_AWAY: "🚩 Հյուրի անկյունայիններ",
+  CARDS_OU: "🟨 Քարտեր",
 };
 
 export function ComboResultCard({ result, index }: { result: ComboResult; index?: number }) {
