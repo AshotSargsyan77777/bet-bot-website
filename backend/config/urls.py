@@ -1,6 +1,7 @@
+from django.conf import settings
 from django.contrib import admin
-from django.http import HttpResponse
-from django.urls import path
+from django.http import FileResponse, Http404, HttpResponse
+from django.urls import path, re_path
 
 from apps.accounts.views import ChangePasswordView, LoginView, LogoutView, MeView, RefreshView, RegisterView
 from apps.checks.views import AdminChecksView, CatalogView, InternalPackagesWebhook, MyCheckView, PublicSummaryView
@@ -23,6 +24,16 @@ from apps.support.views import AdminSupportDetailView, AdminSupportView, Support
 
 def health(_request):
     return HttpResponse("OK", content_type="text/plain")
+
+
+def spa_index(_request):
+    """Serves the built React app for client-side routes (/checks, /games/123, ...)."""
+    index = settings.FRONTEND_DIST / "index.html"
+    if not index.is_file():
+        raise Http404("Frontend build not found")
+    response = FileResponse(index.open("rb"), content_type="text/html")
+    response["Cache-Control"] = "no-cache"
+    return response
 
 
 urlpatterns = [
@@ -56,4 +67,6 @@ urlpatterns = [
     path("api/admin/candidates/<int:pk>/", AdminCandidateDetailView.as_view()),
     path("api/admin/support/", AdminSupportView.as_view()),
     path("api/admin/support/<int:pk>/", AdminSupportDetailView.as_view()),
+    # Must stay last: everything that is not API/admin/static is a React route.
+    re_path(r"^(?!api/|admin/|static/|health/).*$", spa_index),
 ]

@@ -27,6 +27,15 @@ if not SECRET_KEY:
     SECRET_KEY = "dev-insecure-change-me"
 
 ALLOWED_HOSTS = env_list("DJANGO_ALLOWED_HOSTS", "localhost,127.0.0.1")
+CSRF_TRUSTED_ORIGINS = env_list("CSRF_TRUSTED_ORIGINS", "")
+
+# Railway: its public domain and health checker are trusted automatically.
+RAILWAY_PUBLIC_DOMAIN = os.environ.get("RAILWAY_PUBLIC_DOMAIN", "")
+if RAILWAY_PUBLIC_DOMAIN:
+    ALLOWED_HOSTS += [RAILWAY_PUBLIC_DOMAIN]
+    CSRF_TRUSTED_ORIGINS += [f"https://{RAILWAY_PUBLIC_DOMAIN}"]
+if os.environ.get("RAILWAY_ENVIRONMENT"):
+    ALLOWED_HOSTS += ["healthcheck.railway.app"]
 
 INSTALLED_APPS = [
     "django.contrib.admin",
@@ -49,6 +58,7 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
+    "whitenoise.middleware.WhiteNoiseMiddleware",
     "corsheaders.middleware.CorsMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
@@ -79,7 +89,24 @@ TEMPLATES = [
 WSGI_APPLICATION = "config.wsgi.application"
 
 # PostgreSQL is the default database. USE_SQLITE=1 is a convenience for quick local experiments only.
-if env_bool("USE_SQLITE", False):
+# DATABASE_URL (e.g. provided by Railway) takes precedence over the POSTGRES_* variables.
+DATABASE_URL = os.environ.get("DATABASE_URL", "")
+if DATABASE_URL:
+    from urllib.parse import unquote, urlparse
+
+    _db = urlparse(DATABASE_URL)
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.postgresql",
+            "NAME": _db.path.lstrip("/"),
+            "USER": unquote(_db.username or ""),
+            "PASSWORD": unquote(_db.password or ""),
+            "HOST": _db.hostname or "",
+            "PORT": str(_db.port or 5432),
+            "CONN_MAX_AGE": int(os.environ.get("POSTGRES_CONN_MAX_AGE", "60")),
+        }
+    }
+elif env_bool("USE_SQLITE", False):
     DATABASES = {
         "default": {
             "ENGINE": "django.db.backends.sqlite3",
@@ -113,6 +140,13 @@ USE_TZ = True
 
 STATIC_URL = "static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
+STORAGES = {
+    "default": {"BACKEND": "django.core.files.storage.FileSystemStorage"},
+    "staticfiles": {"BACKEND": "whitenoise.storage.CompressedStaticFilesStorage"},
+}
+# Built React app (frontend/dist). When present, Django serves it at "/" (single-service deployment).
+FRONTEND_DIST = Path(os.environ.get("FRONTEND_DIST", BASE_DIR / "frontend_dist"))
+WHITENOISE_ROOT = FRONTEND_DIST if FRONTEND_DIST.is_dir() else None
 MEDIA_URL = "media/"
 MEDIA_ROOT = Path(os.environ.get("MEDIA_ROOT", BASE_DIR / "media"))
 
@@ -125,7 +159,6 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 CORS_ALLOWED_ORIGINS = env_list("CORS_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173")
 CORS_ALLOW_CREDENTIALS = False
-CSRF_TRUSTED_ORIGINS = env_list("CSRF_TRUSTED_ORIGINS", "")
 
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": (

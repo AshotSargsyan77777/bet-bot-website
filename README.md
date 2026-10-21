@@ -108,3 +108,21 @@ docker compose -f docker-compose.prod.yml exec backend python manage.py createsu
 The `web` service (nginx, port 80) serves the built SPA and proxies `/api`, `/admin`, `/health` to gunicorn.
 Terminate TLS in front of it (load balancer / Caddy / Traefik) and forward `X-Forwarded-Proto: https`.
 Uploaded receipts live in the `media` volume and are never publicly served; back up `pgdata` and `media`.
+
+## Deploy on Railway (single service)
+
+`Dockerfile.web` builds the React app and serves it together with the Django API (WhiteNoise), so the
+whole site is one Railway service plus a Railway PostgreSQL database. It is a separate file so the
+Telegram bot service built from this repository is not affected.
+
+1. In the Railway project: **+ New → Database → PostgreSQL**.
+2. **+ New → GitHub Repo →** this repository. In the new service:
+   - Settings → *Config-as-code* → path `railway.web.json` (uses `Dockerfile.web`, health check `/health/`)
+   - Settings → Networking → **Generate Domain**
+   - Volume: mount path `/app/media` (keeps uploaded receipts across deploys)
+3. Variables of the web service:
+   `DATABASE_URL=${{Postgres.DATABASE_URL}}`, `DJANGO_SECRET_KEY`, `DJANGO_DEBUG=0`, `USE_LOCMEM_CACHE=1`,
+   `N8N_INTERNAL_KEY`, `CARD_NUMBER`, `VIP_CHANNEL_LINK`, `API_FOOTBALL_KEY`.
+   The Railway domain is added to `ALLOWED_HOSTS` / `CSRF_TRUSTED_ORIGINS` automatically.
+4. After the first deploy, create an admin from the service shell: `python manage.py createsuperuser`.
+5. n8n webhook URL: `https://<railway-domain>/api/internal/packages/`.

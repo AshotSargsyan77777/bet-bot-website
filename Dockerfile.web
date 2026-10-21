@@ -1,0 +1,22 @@
+# Single-service image for Railway (web site): builds the React app and serves it with the Django API.
+# Kept separate from the Telegram bot (index.js), which Railway may build from this same repository.
+
+FROM node:22-alpine AS frontend
+WORKDIR /frontend
+COPY frontend/package.json frontend/package-lock.json ./
+RUN npm ci
+COPY frontend/ ./
+RUN npm run build
+
+FROM python:3.12-slim
+ENV PYTHONUNBUFFERED=1 PYTHONDONTWRITEBYTECODE=1 PORT=8000
+WORKDIR /app
+RUN apt-get update && apt-get install -y --no-install-recommends libpq-dev gcc && rm -rf /var/lib/apt/lists/*
+COPY backend/requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+COPY backend/ ./
+COPY --from=frontend /frontend/dist ./frontend_dist
+# collectstatic only needs a placeholder secret at build time
+RUN DJANGO_SECRET_KEY=build-only USE_SQLITE=1 python manage.py collectstatic --noinput
+# Runs as root so a mounted Railway volume (/app/media, owned by root) is writable.
+CMD sh -c "python manage.py migrate --noinput && gunicorn config.wsgi:application --bind 0.0.0.0:${PORT} --workers ${WEB_CONCURRENCY:-3} --timeout 60 --access-logfile -"
