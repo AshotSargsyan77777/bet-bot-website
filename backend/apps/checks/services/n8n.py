@@ -1,4 +1,5 @@
 from django.conf import settings
+from django.db import transaction
 
 from apps.checks.constants import N8N_KEYS, PACKAGES, UNAVAILABLE_TEXT
 from apps.checks.models import AppSettings, DailyCheck
@@ -8,6 +9,7 @@ from apps.checks.services.time import yerevan_today
 from apps.commerce.promo import generate_promo_codes
 
 
+@transaction.atomic
 def apply_n8n_packages(packages: list) -> dict:
     today = yerevan_today()
     app = AppSettings.get()
@@ -31,6 +33,8 @@ def apply_n8n_packages(packages: list) -> dict:
         if not pkg.get("available"):
             continue
         selections = pkg.get("selections") or []
+        if not isinstance(selections, list) or not all(isinstance(s, dict) for s in selections):
+            continue
         if not selections:
             continue
         dc = DailyCheck.objects.get(package_key=pkg_key)
@@ -38,10 +42,11 @@ def apply_n8n_packages(packages: list) -> dict:
         dc.selections_json = selections
         dc.is_available = True
         try:
-            dc.combined_odds = float(pkg.get("combined_odds"))
+            odds = round(float(pkg.get("combined_odds")), 2)
+            dc.combined_odds = odds if 1 <= odds < 10**8 else None
         except (TypeError, ValueError):
             dc.combined_odds = None
-        dc.quality = pkg.get("quality") or ""
+        dc.quality = str(pkg.get("quality") or "")[:16]
         dc.save()
         available += 1
 

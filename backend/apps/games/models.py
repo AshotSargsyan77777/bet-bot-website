@@ -14,11 +14,18 @@ class FixtureCache(models.Model):
     goals_home = models.IntegerField(null=True, blank=True)
     goals_away = models.IntegerField(null=True, blank=True)
     raw_json = models.JSONField(default=dict, blank=True)
+    # Last-5 form summaries, stored so list filtering/sorting by form runs in the database.
+    home_form = models.JSONField(null=True, blank=True)
+    away_form = models.JSONField(null=True, blank=True)
+    home_win_pct = models.FloatField(null=True, blank=True)
+    away_win_pct = models.FloatField(null=True, blank=True)
+    form_diff = models.FloatField(null=True, blank=True)
     stats_computed_at = models.DateTimeField(null=True, blank=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
         ordering = ["kickoff"]
+        indexes = [models.Index(fields=["kickoff"], name="fixture_kickoff_idx")]
 
 
 class TeamFormSnapshot(models.Model):

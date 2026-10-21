@@ -15,6 +15,12 @@ class Subscription(models.Model):
 
     class Meta:
         ordering = ["-created_at"]
+        indexes = [models.Index(fields=["user", "is_active"], name="sub_user_active_idx")]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["user"], condition=models.Q(is_active=True), name="one_active_subscription_per_user"
+            )
+        ]
 
 
 class PromoCode(models.Model):
@@ -45,9 +51,18 @@ class Payment(models.Model):
     receipt = models.ImageField(upload_to="receipts/%Y/%m/")
     created_at = models.DateTimeField(auto_now_add=True)
     reviewed_at = models.DateTimeField(null=True, blank=True)
+    reviewed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="reviewed_payments"
+    )
 
     class Meta:
         ordering = ["-created_at"]
+        indexes = [models.Index(fields=["status", "-created_at"], name="payment_status_created_idx")]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["user"], condition=models.Q(status="pending"), name="one_pending_payment_per_user"
+            )
+        ]
 
 
 class VipMember(models.Model):
@@ -66,3 +81,6 @@ class SelectionCandidate(models.Model):
     reasons = models.JSONField(default=list, blank=True)
     active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]

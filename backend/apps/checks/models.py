@@ -31,7 +31,10 @@ class DailyCheck(models.Model):
 
     @classmethod
     def ensure_defaults(cls):
+        existing = set(cls.objects.values_list("package_key", flat=True))
         for key in PACKAGES:
+            if key in existing:
+                continue
             label = PACKAGES[key]["label"]
             default_body = f"{label} չեկը {DEFAULT_TEXT}"
             cls.objects.get_or_create(

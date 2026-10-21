@@ -29,11 +29,17 @@ def _get(path: str, params: dict | None = None, cache_ttl: int = 300) -> Any:
     if cached is not None:
         return cached
     url = f"{BASE_URL}{path}"
-    r = requests.get(url, headers=_headers(), params=params, timeout=30)
+    try:
+        r = requests.get(url, headers=_headers(), params=params, timeout=30)
+    except requests.RequestException as e:
+        logger.warning("API-Football request failed: %s", e)
+        raise FootballApiError("API-Football is unreachable") from e
     if r.status_code != 200:
-        raise FootballApiError(f"HTTP {r.status_code}: {r.text[:200]}")
+        logger.warning("API-Football HTTP %s on %s", r.status_code, path)
+        raise FootballApiError(f"API-Football HTTP {r.status_code}")
     data = r.json()
     if data.get("errors"):
+        logger.warning("API-Football error on %s: %s", path, data["errors"])
         raise FootballApiError(str(data["errors"]))
     cache.set(cache_key, data, cache_ttl)
     return data
@@ -68,11 +74,16 @@ def head_to_head(team1: int, team2: int, last: int = 5) -> list:
     return data.get("response") or []
 
 
+def is_configured() -> bool:
+    return bool(settings.API_FOOTBALL_KEY)
+
+
 def parse_kickoff(fixture: dict) -> datetime:
+    from django.utils import timezone
     from django.utils.dateparse import parse_datetime
 
     fi = fixture.get("fixture") or {}
-    dt = parse_datetime(fi.get("date", ""))
+    dt = parse_datetime(fi.get("date") or "")
     if dt is None:
-        return datetime.utcnow()
+        return timezone.now()
     return dt

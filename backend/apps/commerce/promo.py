@@ -1,8 +1,4 @@
 import secrets
-import string
-from datetime import datetime
-
-from django.utils import timezone
 
 from apps.checks.services.time import yerevan_today
 from apps.commerce.models import PromoCode
