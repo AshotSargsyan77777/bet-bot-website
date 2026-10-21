@@ -4,7 +4,13 @@
   "description": "Telegram Bot",
   "main": "index.js",
   "scripts": {
-    "start": "node index.js"
+    "start": "node index.js",
+    "dev:backend": "cd backend && python manage.py runserver 127.0.0.1:8000",
+    "dev:frontend": "cd frontend && npm run dev",
+    "dev:all": "npx concurrently -n api,web -c blue,green \"npm run dev:backend\" \"npm run dev:frontend\""
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2"
   },
   "keywords": [],
   "author": "",

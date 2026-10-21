@@ -1,3 +1,10 @@
 .env
 node_modules/
 *.log
+backend/db.sqlite3
+backend/media/
+backend/staticfiles/
+__pycache__/
+*.pyc
+frontend/dist/
+.venv/
