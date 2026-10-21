@@ -92,12 +92,10 @@ function goalModel(lh, la) {
   }
   let pH = 0, pD = 0, pA = 0, btts = 0, wnH = 0, wnA = 0, csH = 0, csA = 0;
   const total = new Array(2 * MAXG + 1).fill(0);
-  const diff = {};
   const homeG = new Array(MAXG + 1).fill(0), awayG = new Array(MAXG + 1).fill(0);
   for (let i = 0; i <= MAXG; i++) for (let j = 0; j <= MAXG; j++) {
     const p = grid[i][j] / tot;
     total[i + j] += p; homeG[i] += p; awayG[j] += p;
-    diff[i - j] = (diff[i - j] || 0) + p;
     if (i > j) pH += p; else if (i === j) pD += p; else pA += p;
     if (i > 0 && j > 0) btts += p;
     if (j === 0) csH += p;
@@ -110,16 +108,7 @@ function goalModel(lh, la) {
     over: (line) => overFrom(total, line),
     pTotal: (k) => total[k] ?? 0,
     homeOver: (line) => overFrom(homeG, line),
-    awayOver: (line) => overFrom(awayG, line),
-    // Asian handicap. h՝ տան թիմին կիրառվող handicap. վերադարձնում է {win, push}
-    ah: (h, side) => {
-      let win = 0, push = 0;
-      for (const [dStr, p] of Object.entries(diff)) {
-        const d = Number(dStr) * (side === 'H' ? 1 : -1) + h;
-        if (d > 0) win += p; else if (d === 0) push += p;
-      }
-      return { win, push };
-    },
+    awayOver: (line) => overFrom(awayG, line)
   };
 }
 
@@ -333,20 +322,6 @@ function buildCandidates(item) {
   add('DNB', `Draw No Bet — ${home}`, getOdd(pref, 'DNB', 'Home'), pH / (pH + pA), mDnb ? mDnb[0] : null, r1(pH / (pH + pA)));
   add('DNB', `Draw No Bet — ${away}`, getOdd(pref, 'DNB', 'Away'), pA / (pH + pA), mDnb ? mDnb[1] : null, r1(pA / (pH + pA)));
 
-  // ---- Asian handicap (միայն .0 և .5 գծեր) ----
-  for (const o of pref.filter((x) => x.market === 'ASIAN_HANDICAP')) {
-    const m = /^(home|away)\s*([+-]?\d+(?:\.\d+)?)$/i.exec(o.selection.trim());
-    if (!m) continue;
-    const h = parseFloat(m[2]);
-    if (!Number.isInteger(h * 2)) continue;              // quarter գծերը (.25/.75) բաց ենք թողնում
-    const side = m[1].toLowerCase() === 'home' ? 'H' : 'A';
-    const team = side === 'H' ? home : away;
-    const { win, push } = model.ah(h, side);
-    const sign = h > 0 ? '+' : h < 0 ? '−' : '';
-    const why = push > 0.005 ? `AH ${sign}${Math.abs(h)}: win ${pct(win)}, push ${pct(push)}` : `AH ${sign}${Math.abs(h)}: win ${pct(win)}`;
-    add('ASIAN_HANDICAP', `${team} ${sign}${Math.abs(h)} (Asian Handicap)`, o.odd, win, null, [why, ...base]);
-  }
-
   // ---- BTTS ----
   const mB = consensus(books, 'BTTS', ['Yes', 'No']);
   const bttsR = [`Poisson BTTS ${pct(model.btts)}`, ...base];
@@ -433,7 +408,6 @@ function buildCandidates(item) {
     if (c.market === 'MATCH_WINNER') return s.includes('(Home Win)') ? 'H' : 'A';
     if (c.market === 'DOUBLE_CHANCE') return s.startsWith(home) ? 'H' : 'A';
     if (c.market === 'DNB') return s.endsWith(home) ? 'H' : 'A';
-    if (c.market === 'ASIAN_HANDICAP') return s.startsWith(home) ? 'H' : 'A';
     if (/^(WIN_TO_NIL|CLEAN_SHEET)_HOME$/.test(c.market) && /Yes$/i.test(s)) return 'H';
     if (/^(WIN_TO_NIL|CLEAN_SHEET)_AWAY$/.test(c.market) && /Yes$/i.test(s)) return 'A';
     return null;
