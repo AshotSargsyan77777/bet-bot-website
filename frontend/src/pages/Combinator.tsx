@@ -1,12 +1,9 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { api } from "../api/client";
-import { DemoBanner } from "../components/DemoBanner";
 import { PageHeader } from "../components/PageHeader";
 import { ComboResultCard } from "../components/stats/ComboResultCard";
-import { demoCombinatorResults } from "../data/demo";
 import type { ComboResult } from "../types/form";
-import { filterDemoCombinatorResults } from "../utils/demoCombinatorSearch";
 
 const PRESETS = [
   { label: "x9", min: 8.5, max: 9.5, legs: 9 },
@@ -14,131 +11,146 @@ const PRESETS = [
   { label: "x20", min: 18, max: 22, legs: 12 },
 ];
 
-function parseNum(s: string, fallback: number): number {
+type SearchParams = { targetMin: string; targetMax: string; legs: string; legMin: string; legMax: string };
+type SearchResponse = { results: ComboResult[]; candidates_used: number; timed_out: boolean; pool_size: number };
+
+function parseNum(s: string): number | null {
   const n = parseFloat(s.replace(",", "."));
-  return Number.isFinite(n) ? n : fallback;
+  return Number.isFinite(n) ? n : null;
+}
+
+function validate(p: SearchParams): string | null {
+  const tMin = parseNum(p.targetMin);
+  const tMax = parseNum(p.targetMax);
+  const lMin = parseNum(p.legMin);
+  const lMax = parseNum(p.legMax);
+  const legs = parseInt(p.legs, 10);
+  if (tMin == null || tMax == null || lMin == null || lMax == null || !Number.isFinite(legs)) {
+    return "Լրացրեք բոլոր դաշտերը թվերով";
+  }
+  if (tMin < 1.01 || tMin > tMax) return "Ընդհանուր գործակցի min-ը պետք է լինի ≥ 1.01 և ≤ max";
+  if (lMin < 1 || lMin > lMax) return "Ողի min գործակիցը պետք է լինի ≥ 1 և ≤ max";
+  if (legs < 1 || legs > 20) return "Ողների քանակը՝ 1-ից 20";
+  return null;
 }
 
 export function Combinator() {
   const pool = useQuery({
     queryKey: ["combinator-pool"],
     queryFn: () => api<{ count: number }>("/api/combinator/pool/"),
-    retry: false,
   });
 
-  const [targetMinStr, setTargetMinStr] = useState("9");
-  const [targetMaxStr, setTargetMaxStr] = useState("10");
-  const [legsStr, setLegsStr] = useState("10");
-  const [legMinStr, setLegMinStr] = useState("1.1");
-  const [legMaxStr, setLegMaxStr] = useState("1.5");
-  const [results, setResults] = useState<ComboResult[]>(demoCombinatorResults);
-  const [searchError, setSearchError] = useState("");
-  const [usedDemo, setUsedDemo] = useState(true);
+  const [form, setForm] = useState<SearchParams>({
+    targetMin: "9",
+    targetMax: "10",
+    legs: "10",
+    legMin: "1.1",
+    legMax: "1.5",
+  });
+  const [formError, setFormError] = useState("");
 
   const search = useMutation({
-    mutationFn: async () => {
-      const targetMin = parseNum(targetMinStr, 9);
-      const targetMax = parseNum(targetMaxStr, 10);
-      const legs = parseInt(legsStr, 10) || 10;
-      return api<{ results: ComboResult[] }>("/api/combinator/search/", {
+    mutationFn: (p: SearchParams) =>
+      api<SearchResponse>("/api/combinator/search/", {
         method: "POST",
         json: {
-          target_odds_min: targetMin,
-          target_odds_max: targetMax,
-          legs_count: legs,
-          leg_odds_min: parseNum(legMinStr, 1.1),
-          leg_odds_max: parseNum(legMaxStr, 1.5),
+          target_odds_min: parseNum(p.targetMin),
+          target_odds_max: parseNum(p.targetMax),
+          legs_count: parseInt(p.legs, 10),
+          leg_odds_min: parseNum(p.legMin),
+          leg_odds_max: parseNum(p.legMax),
           max_results: 10,
         },
-      });
-    },
-    onSuccess: (data) => {
-      setSearchError("");
-      setUsedDemo(false);
-      if (data.results?.length) {
-        setResults(data.results);
-      } else {
-        runDemoSearch();
-        setSearchError("API-ն ոչինչ չգտավ — ցուցադրվում է demo արդյունք։");
-      }
-    },
-    onError: () => {
-      runDemoSearch();
-      setSearchError("Որոնումը demo ռեժիմում (մուտք/API պարտադիր չէ)։");
-    },
+      }),
   });
 
-  const runDemoSearch = () => {
-    const targetMin = parseNum(targetMinStr, 9);
-    const targetMax = parseNum(targetMaxStr, 10);
-    const legs = parseInt(legsStr, 10) || 10;
-    const filtered = filterDemoCombinatorResults(targetMin, targetMax, legs);
-    setResults(filtered.length ? filtered : demoCombinatorResults);
-    setUsedDemo(true);
+  const run = (p: SearchParams) => {
+    const err = validate(p);
+    setFormError(err ?? "");
+    if (!err) search.mutate(p);
   };
 
+  const set = (key: keyof SearchParams) => (e: React.ChangeEvent<HTMLInputElement>) =>
+    setForm((f) => ({ ...f, [key]: e.target.value }));
+
   const poolCount = pool.data?.count ?? 0;
-  const showDemo = pool.isError || poolCount < 3;
+  const results = search.data?.results ?? [];
 
   return (
     <div>
       <PageHeader
         eyebrow="Հավելվածներ"
         title="🎯 Կոնստրուկտոր չեկի"
-        subtitle="Պրեսետներն աշխատում են անմիջապես — կարող եք նաև փորձել API որոնումը։"
+        subtitle="Ընտրեք պրեսետ կամ նշեք ցանկալի ընդհանուր գործակիցը և ողների քանակը։"
       />
-      {showDemo && <DemoBanner />}
       <div className="card card--glass">
         <p>
-          Թեկուկներից հավելված: <strong className="gradient-text">{pool.isError ? "demo" : poolCount}</strong>
+          Այսօրվա ընտրանքներ: <strong className="gradient-text">{pool.isLoading ? "…" : poolCount}</strong>
         </p>
+        {pool.isError && <p className="field__error">{pool.error.message}</p>}
+        {pool.data && poolCount === 0 && (
+          <p className="field__hint">Այսօրվա ընտրանքները դեռ պատրաստ չեն — կոմբինացիաները հասանելի կլինեն չեկերի թարմացումից հետո։</p>
+        )}
         <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap", margin: "1rem 0" }}>
           {PRESETS.map((p) => (
             <button
               key={p.label}
               type="button"
               className="secondary"
+              disabled={search.isPending}
               onClick={() => {
-                setTargetMinStr(String(p.min));
-                setTargetMaxStr(String(p.max));
-                setLegsStr(String(p.legs));
-                setTimeout(runDemoSearch, 0);
+                const next = { ...form, targetMin: String(p.min), targetMax: String(p.max), legs: String(p.legs) };
+                setForm(next);
+                run(next);
               }}
             >
               {p.label}
             </button>
           ))}
         </div>
-        <div className="filters">
-          <div className="field">
-            <span className="field__label">Min ընդհանուր кф</span>
-            <input type="text" inputMode="decimal" value={targetMinStr} onChange={(e) => setTargetMinStr(e.target.value)} />
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            run(form);
+          }}
+        >
+          <div className="filters">
+            <div className="field">
+              <span className="field__label">Min ընդհանուր кф</span>
+              <input type="text" inputMode="decimal" value={form.targetMin} onChange={set("targetMin")} />
+            </div>
+            <div className="field">
+              <span className="field__label">Max ընդհանուր кф</span>
+              <input type="text" inputMode="decimal" value={form.targetMax} onChange={set("targetMax")} />
+            </div>
+            <div className="field">
+              <span className="field__label">Ողներ</span>
+              <input type="text" inputMode="numeric" value={form.legs} onChange={set("legs")} />
+            </div>
+            <div className="field">
+              <span className="field__label">Min кф (ոգ)</span>
+              <input type="text" inputMode="decimal" value={form.legMin} onChange={set("legMin")} />
+            </div>
+            <div className="field">
+              <span className="field__label">Max кф (ոգ)</span>
+              <input type="text" inputMode="decimal" value={form.legMax} onChange={set("legMax")} />
+            </div>
           </div>
-          <div className="field">
-            <span className="field__label">Max ընդհանուր кф</span>
-            <input type="text" inputMode="decimal" value={targetMaxStr} onChange={(e) => setTargetMaxStr(e.target.value)} />
+          <div className="filters-toolbar">
+            <button type="submit" disabled={search.isPending}>
+              {search.isPending ? "Որոնում…" : "Որոնել"}
+            </button>
           </div>
-          <div className="field">
-            <span className="field__label">Ողներ</span>
-            <input type="text" inputMode="numeric" value={legsStr} onChange={(e) => setLegsStr(e.target.value)} />
-          </div>
-          <div className="field">
-            <span className="field__label">Min кф (ոգ)</span>
-            <input type="text" inputMode="decimal" value={legMinStr} onChange={(e) => setLegMinStr(e.target.value)} />
-          </div>
-          <div className="field">
-            <span className="field__label">Max кф (ոգ)</span>
-            <input type="text" inputMode="decimal" value={legMaxStr} onChange={(e) => setLegMaxStr(e.target.value)} />
-          </div>
-        </div>
-        <div className="filters-toolbar">
-          <button type="button" onClick={() => search.mutate()} disabled={search.isPending}>
-            {search.isPending ? "Որոնում…" : "Որոնել API-ում"}
-          </button>
-          <button type="button" className="secondary" onClick={runDemoSearch}>Demo որոնում</button>
-        </div>
-        {searchError && <p className="field__hint">{searchError}</p>}
-        {usedDemo && <p className="field__hint">Ցուցադրվում են հասկանալի քարտեր, ոչ JSON։</p>}
+        </form>
+        {formError && <p className="field__error">{formError}</p>}
+        {search.isError && <p className="field__error">{search.error.message}</p>}
+        {search.data && results.length === 0 && (
+          <p className="field__hint">
+            Կոմբինացիաներ չգտնվեցին ({search.data.candidates_used} ընտրանքից)։ Փորձեք լայնացնել գործակիցների միջակայքը կամ
+            փոքրացնել ողների քանակը։
+          </p>
+        )}
+        {search.data?.timed_out && <p className="field__hint">Որոնումը կանգնեցվեց ժամանակի սահմանափակման պատճառով — ցուցադրվում են գտնվածները։</p>}
       </div>
       {results.map((r, i) => (
         <ComboResultCard key={i} result={r} index={i} />

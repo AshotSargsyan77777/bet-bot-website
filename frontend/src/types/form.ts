@@ -27,7 +27,7 @@ export type H2HMatch = {
   date?: string;
   home?: string;
   away?: string;
-  goals?: { home: number; away: number };
+  goals?: { home: number | null; away: number | null } | null;
 };
 
 export type ComboLeg = {
@@ -36,6 +36,7 @@ export type ComboLeg = {
   selection?: string;
   odd?: number;
   why?: string;
+  reasons?: string[];
 };
 
 export type ComboResult = {

@@ -1,6 +1,6 @@
 import type { FormSlice } from "../types/game";
 
-export function FormBars({ form, label }: { form?: FormSlice; label: string }) {
+export function FormBars({ form, label }: { form?: FormSlice | null; label: string }) {
   if (!form) return <span className="muted">—</span>;
   return (
     <div className="form-bars">

@@ -154,8 +154,9 @@ a:hover {
 
 .layout:not(.layout--landing) .site-nav-wrap {
   width: auto;
-  margin-left: -1.25rem;
-  margin-right: -1.25rem;
+  /* match .layout's horizontal padding so the bar is edge-to-edge without overflowing on phones */
+  margin-left: calc(-1 * clamp(1rem, 3vw, 2rem));
+  margin-right: calc(-1 * clamp(1rem, 3vw, 2rem));
 }
 
 .site-nav {
@@ -502,40 +503,11 @@ label {
   animation: pulse-glow 2s ease infinite;
 }
 
-.pill--demo {
-  background: rgba(34, 211, 238, 0.15);
-  color: var(--accent-3);
-  border: 1px solid rgba(34, 211, 238, 0.35);
-  right: auto;
-  left: 0.75rem;
-}
-
 .live-dot {
   width: 6px;
   height: 6px;
   border-radius: 50%;
   background: var(--danger);
-}
-
-.demo-banner {
-  display: flex;
-  align-items: center;
-  gap: 0.65rem;
-  padding: 0.65rem 1rem;
-  margin-bottom: 1.25rem;
-  border-radius: var(--radius);
-  background: linear-gradient(90deg, rgba(34, 211, 238, 0.12), rgba(99, 102, 241, 0.12));
-  border: 1px solid rgba(34, 211, 238, 0.25);
-  font-size: 0.85rem;
-  color: var(--accent-3);
-}
-
-.demo-banner__dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--accent-3);
-  animation: pulse-glow 2s ease infinite;
 }
 
 /* ----- Game cards ----- */

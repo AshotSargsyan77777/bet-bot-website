@@ -13,6 +13,8 @@ const publicLinks: NavItem[] = [
 ];
 
 const loggedInLinks: NavItem[] = [
+  { to: "/status", label: "Կարգավիճակ" },
+  { to: "/promo", label: "Պրոմո" },
   { to: "/vip", label: "VIP" },
   { to: "/help", label: "Support" },
 ];
@@ -27,7 +29,7 @@ export function Layout() {
     queryFn: () => api<{ is_vip: boolean }>("/api/vip/status/"),
     enabled: !!user,
   });
-  const isVip = !!vip.data?.is_vip;
+  const isVip = !!vip.data?.is_vip || !!user?.is_admin;
 
   const links: NavItem[] = [
     ...publicLinks,
@@ -59,8 +61,8 @@ export function Layout() {
 
           {user ? (
             <div className="site-nav__auth">
-              <span className="site-nav__user">{user.username}</span>
-              <button type="button" className="secondary site-nav__logout" onClick={logout}>Ելք</button>
+              <Link to="/status" className="site-nav__user">{user.username}</Link>
+              <button type="button" className="secondary site-nav__logout" onClick={() => void logout()}>Ելք</button>
             </div>
           ) : (
             <Link to="/login" className="site-nav__cta">Մուտք</Link>

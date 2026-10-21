@@ -1,25 +1,36 @@
 import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, Navigate, useNavigate } from "react-router-dom";
+import { ApiError } from "../api/client";
 import { useAuth } from "../context/AuthContext";
 
 export function Login() {
-  const { login, register } = useAuth();
+  const { user, login, register } = useAuth();
   const nav = useNavigate();
   const [mode, setMode] = useState<"login" | "register">("login");
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string[]>>({});
+  const [busy, setBusy] = useState(false);
+
+  if (user) return <Navigate to="/checks" replace />;
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
+    setFieldErrors({});
+    setBusy(true);
     try {
       if (mode === "login") await login(username, password);
       else await register(username, email, password);
       nav("/checks");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Սխալ");
+      if (err instanceof ApiError && err.status === 401) setError("Սխալ օգտանուն կամ գաղտնաբառ");
+      else setError(err instanceof Error ? err.message : "Սխալ");
+      if (err instanceof ApiError && err.fields) setFieldErrors(err.fields);
+    } finally {
+      setBusy(false);
     }
   };
 
@@ -37,6 +48,7 @@ export function Login() {
               autoComplete="username"
               placeholder="օր. Ashot Sargsyan "
             />
+            {fieldErrors.username && <span className="field__error">{fieldErrors.username[0]}</span>}
           </div>
           {mode === "register" && (
             <div className="field">
@@ -49,30 +61,34 @@ export function Login() {
                 required
                 placeholder="example@gmail.com"
               />
+              {fieldErrors.email && <span className="field__error">{fieldErrors.email[0]}</span>}
             </div>
           )}
           <label>
-            Password
+            Գաղտնաբառ
             <input
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
+              minLength={mode === "register" ? 8 : undefined}
               autoComplete={mode === "login" ? "current-password" : "new-password"}
             />
           </label>
           {error && <p className="field__error">{error}</p>}
           {mode === "register" && (
-            <p className="field__hint">
-              Պահանջվում է աշխատող Django API (պորտ 8000). Root-ից՝ npm run dev:all
-            </p>
+            <p className="field__hint">Գաղտնաբառը՝ առնվազն 8 նիշ, ոչ միայն թվեր և ոչ շատ պարզ։</p>
           )}
-          <button type="submit" style={{ marginTop: "1.25rem", width: "100%" }}>
-            {mode === "login" ? "Մուտք" : "Գրանցվել"}
+          <button type="submit" disabled={busy} style={{ marginTop: "1.25rem", width: "100%" }}>
+            {busy ? "…" : mode === "login" ? "Մուտք" : "Գրանցվել"}
           </button>
         </form>
         <p style={{ marginTop: "1.25rem", textAlign: "center" }}>
-          <button type="button" className="secondary" onClick={() => setMode(mode === "login" ? "register" : "login")}>
+          <button type="button" className="secondary" onClick={() => {
+              setMode(mode === "login" ? "register" : "login");
+              setError("");
+              setFieldErrors({});
+            }}>
             {mode === "login" ? "Գրանցում" : "Մուտք"}
           </button>
           {" · "}

@@ -5,7 +5,8 @@ from apps.checks.models import AppSettings, DailyCheck
 from apps.checks.services.time import yerevan_today
 
 
-def check_is_ready(check: DailyCheck) -> bool:
+def check_is_ready(check: DailyCheck, checks_date: str | None = None) -> bool:
+    """`checks_date` may be passed in to avoid re-reading AppSettings for every check."""
     text = check.body_text or ""
     if DEFAULT_TEXT in text or UNAVAILABLE_TEXT in text:
         return False
@@ -13,8 +14,14 @@ def check_is_ready(check: DailyCheck) -> bool:
         return False
     if check.package_key == "pkg_5" and not settings.PROMO_FROM_3X:
         return True
-    app = AppSettings.get()
-    return app.checks_date == yerevan_today()
+    if checks_date is None:
+        checks_date = AppSettings.get().checks_date
+    return checks_date == yerevan_today()
+
+
+def ready_package_keys() -> list[str]:
+    checks_date = AppSettings.get().checks_date
+    return [c.package_key for c in DailyCheck.objects.all() if check_is_ready(c, checks_date)]
 
 
 def get_check_display_text(check: DailyCheck) -> str:

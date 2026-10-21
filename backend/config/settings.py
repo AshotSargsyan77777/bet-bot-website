@@ -2,15 +2,31 @@ import os
 from datetime import timedelta
 from pathlib import Path
 
+from django.core.exceptions import ImproperlyConfigured
 from dotenv import load_dotenv
 
 load_dotenv(Path(__file__).resolve().parent.parent.parent / ".env")
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-SECRET_KEY = os.environ.get("DJANGO_SECRET_KEY", "dev-insecure-change-me")
-DEBUG = os.environ.get("DJANGO_DEBUG", "1") == "1"
-ALLOWED_HOSTS = [h.strip() for h in os.environ.get("DJANGO_ALLOWED_HOSTS", "localhost,127.0.0.1").split(",") if h.strip()]
+
+def env_bool(name: str, default: bool = False) -> bool:
+    return os.environ.get(name, "1" if default else "0").strip().lower() in ("1", "true", "yes", "on")
+
+
+def env_list(name: str, default: str = "") -> list[str]:
+    return [x.strip() for x in os.environ.get(name, default).split(",") if x.strip()]
+
+
+DEBUG = env_bool("DJANGO_DEBUG", False)
+
+SECRET_KEY = os.environ.get("DJANGO_SECRET_KEY", "")
+if not SECRET_KEY:
+    if not DEBUG:
+        raise ImproperlyConfigured("DJANGO_SECRET_KEY must be set when DJANGO_DEBUG=0")
+    SECRET_KEY = "dev-insecure-change-me"
+
+ALLOWED_HOSTS = env_list("DJANGO_ALLOWED_HOSTS", "localhost,127.0.0.1")
 
 INSTALLED_APPS = [
     "django.contrib.admin",
@@ -20,6 +36,7 @@ INSTALLED_APPS = [
     "django.contrib.messages",
     "django.contrib.staticfiles",
     "rest_framework",
+    "rest_framework_simplejwt.token_blacklist",
     "corsheaders",
     "django_filters",
     "apps.accounts",
@@ -61,7 +78,8 @@ TEMPLATES = [
 
 WSGI_APPLICATION = "config.wsgi.application"
 
-if os.environ.get("USE_SQLITE", "1") == "1":
+# PostgreSQL is the default database. USE_SQLITE=1 is a convenience for quick local experiments only.
+if env_bool("USE_SQLITE", False):
     DATABASES = {
         "default": {
             "ENGINE": "django.db.backends.sqlite3",
@@ -74,9 +92,10 @@ else:
             "ENGINE": "django.db.backends.postgresql",
             "NAME": os.environ.get("POSTGRES_DB", "goalking"),
             "USER": os.environ.get("POSTGRES_USER", "goalking"),
-            "PASSWORD": os.environ.get("POSTGRES_PASSWORD", "goalking"),
+            "PASSWORD": os.environ.get("POSTGRES_PASSWORD", ""),
             "HOST": os.environ.get("POSTGRES_HOST", "localhost"),
             "PORT": os.environ.get("POSTGRES_PORT", "5432"),
+            "CONN_MAX_AGE": int(os.environ.get("POSTGRES_CONN_MAX_AGE", "60")),
         }
     }
 
@@ -95,16 +114,18 @@ USE_TZ = True
 STATIC_URL = "static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
 MEDIA_URL = "media/"
-MEDIA_ROOT = BASE_DIR / "media"
+MEDIA_ROOT = Path(os.environ.get("MEDIA_ROOT", BASE_DIR / "media"))
+
+# Payment receipts are private: they are only served to admins through the API.
+RECEIPT_MAX_BYTES = int(os.environ.get("RECEIPT_MAX_MB", "5")) * 1024 * 1024
+DATA_UPLOAD_MAX_MEMORY_SIZE = RECEIPT_MAX_BYTES + 1024 * 1024
+FILE_UPLOAD_MAX_MEMORY_SIZE = 2_621_440
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
-CORS_ALLOWED_ORIGINS = [
-    o.strip()
-    for o in os.environ.get("CORS_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173").split(",")
-    if o.strip()
-]
-CORS_ALLOW_CREDENTIALS = True
+CORS_ALLOWED_ORIGINS = env_list("CORS_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173")
+CORS_ALLOW_CREDENTIALS = False
+CSRF_TRUSTED_ORIGINS = env_list("CSRF_TRUSTED_ORIGINS", "")
 
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": (
@@ -112,44 +133,96 @@ REST_FRAMEWORK = {
     ),
     "DEFAULT_PERMISSION_CLASSES": ("rest_framework.permissions.IsAuthenticated",),
     "DEFAULT_FILTER_BACKENDS": ("django_filters.rest_framework.DjangoFilterBackend",),
+    "DEFAULT_RENDERER_CLASSES": ("rest_framework.renderers.JSONRenderer",),
+    "DEFAULT_PAGINATION_CLASS": "config.pagination.StandardPagination",
+    "PAGE_SIZE": 20,
+    "EXCEPTION_HANDLER": "config.exceptions.api_exception_handler",
     "DEFAULT_THROTTLE_CLASSES": [
         "rest_framework.throttling.AnonRateThrottle",
         "rest_framework.throttling.UserRateThrottle",
     ],
-    "DEFAULT_THROTTLE_RATES": {"anon": "100/hour", "user": "1000/hour", "combinator": "30/hour"},
+    "DEFAULT_THROTTLE_RATES": {
+        "anon": os.environ.get("THROTTLE_ANON", "600/hour"),
+        "user": os.environ.get("THROTTLE_USER", "3000/hour"),
+        "auth": os.environ.get("THROTTLE_AUTH", "20/minute"),
+        "promo": os.environ.get("THROTTLE_PROMO", "10/minute"),
+        "support": os.environ.get("THROTTLE_SUPPORT", "20/hour"),
+        "combinator": os.environ.get("THROTTLE_COMBINATOR", "30/hour"),
+    },
 }
+if DEBUG:
+    REST_FRAMEWORK["DEFAULT_RENDERER_CLASSES"] += ("rest_framework.renderers.BrowsableAPIRenderer",)
 
 SIMPLE_JWT = {
-    "ACCESS_TOKEN_LIFETIME": timedelta(days=7),
-    "REFRESH_TOKEN_LIFETIME": timedelta(days=30),
+    "ACCESS_TOKEN_LIFETIME": timedelta(minutes=int(os.environ.get("JWT_ACCESS_MINUTES", "30"))),
+    "REFRESH_TOKEN_LIFETIME": timedelta(days=int(os.environ.get("JWT_REFRESH_DAYS", "14"))),
+    "ROTATE_REFRESH_TOKENS": True,
+    "BLACKLIST_AFTER_ROTATION": True,
+    "UPDATE_LAST_LOGIN": True,
 }
 
 CELERY_BROKER_URL = os.environ.get("CELERY_BROKER_URL", "redis://localhost:6379/0")
 CELERY_RESULT_BACKEND = os.environ.get("CELERY_RESULT_BACKEND", CELERY_BROKER_URL)
 CELERY_TIMEZONE = TIME_ZONE
 
-CACHES = {
-    "default": {
-        "BACKEND": "django.core.cache.backends.redis.RedisCache",
-        "LOCATION": os.environ.get("REDIS_URL", "redis://localhost:6379/1"),
-    }
-}
-if os.environ.get("USE_LOCMEM_CACHE", "1") == "1":
+if env_bool("USE_LOCMEM_CACHE", False):
     CACHES = {"default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache"}}
+else:
+    CACHES = {
+        "default": {
+            "BACKEND": "django.core.cache.backends.redis.RedisCache",
+            "LOCATION": os.environ.get("REDIS_URL", "redis://localhost:6379/1"),
+        }
+    }
+
+# Production hardening (only when DEBUG is off)
+if not DEBUG:
+    SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+    SECURE_SSL_REDIRECT = env_bool("SECURE_SSL_REDIRECT", True)
+    SECURE_REDIRECT_EXEMPT = [r"^health/$"]
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
+    SECURE_HSTS_SECONDS = int(os.environ.get("SECURE_HSTS_SECONDS", "31536000"))
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+    SECURE_CONTENT_TYPE_NOSNIFF = True
+    SECURE_REFERRER_POLICY = "same-origin"
+    X_FRAME_OPTIONS = "DENY"
+
+LOG_LEVEL = os.environ.get("LOG_LEVEL", "INFO")
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "formatters": {
+        "default": {"format": "%(asctime)s %(levelname)s %(name)s: %(message)s"},
+    },
+    "handlers": {
+        "console": {"class": "logging.StreamHandler", "formatter": "default"},
+    },
+    "root": {"handlers": ["console"], "level": LOG_LEVEL},
+    "loggers": {
+        "django.request": {"handlers": ["console"], "level": "WARNING", "propagate": False},
+    },
+}
 
 # Goalking business config
 N8N_INTERNAL_KEY = os.environ.get("N8N_INTERNAL_KEY", "")
 CARD_NUMBER = os.environ.get("CARD_NUMBER", "")
-VIP_CHANNEL_LINK = os.environ.get("VIP_CHANNEL_LINK", "https://t.me/+gbMtx2wt-UA4NGRi")
-PROMO_FROM_3X = os.environ.get("PROMO_FROM_3X", "0") == "1"
+VIP_CHANNEL_LINK = os.environ.get("VIP_CHANNEL_LINK", "")
+PROMO_FROM_3X = env_bool("PROMO_FROM_3X", False)
 PROMOS_PER_UPDATE = max(0, int(os.environ.get("PROMOS_PER_UPDATE", "1")))
 API_FOOTBALL_KEY = os.environ.get("API_FOOTBALL_KEY", "")
-ADMIN_EMAILS = [e.strip().lower() for e in os.environ.get("ADMIN_EMAILS", "").split(",") if e.strip()]
+# How long computed team form (last N matches) is reused before re-fetching from API-Football.
+FORM_STATS_TTL_MINUTES = int(os.environ.get("FORM_STATS_TTL_MINUTES", "360"))
 
 CELERY_BEAT_SCHEDULE = {
     "sync-today-fixtures": {
         "task": "apps.games.tasks.sync_fixtures_for_date",
-        "schedule": 300.0,
+        "schedule": float(os.environ.get("FIXTURE_SYNC_SECONDS", "300")),
+    },
+    "compute-today-form": {
+        "task": "apps.games.tasks.compute_form_for_date",
+        "schedule": float(os.environ.get("FORM_COMPUTE_SECONDS", "900")),
+        "kwargs": {"limit": int(os.environ.get("FORM_COMPUTE_LIMIT", "40"))},
     },
 }
 
