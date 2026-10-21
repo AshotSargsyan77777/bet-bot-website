@@ -9,7 +9,6 @@ const marketLabel: Record<string, string> = {
   TEAM_TOTAL_HOME: "⚽ Տան թիմի գոլեր",
   TEAM_TOTAL_AWAY: "⚽ Հյուրի գոլեր",
   OU_1H: "⏱ 1-ին խաղակես",
-  ASIAN_HANDICAP: "⚖️ Ասիական ֆորա",
   CORNERS_OU: "🚩 Անկյունայիններ",
   CORNERS_HOME: "🚩 Տան թիմի անկյունայիններ",
   CORNERS_AWAY: "🚩 Հյուրի անկյունայիններ",

@@ -125,9 +125,6 @@ class ExplanationTests(SimpleTestCase):
         self.assertIn("5.3", self.explain("CORNERS_AWAY", "B Corners Over 4.5"))
         self.assertIn("4.2", self.explain("CARDS_OU", "Cards Over 3.5"))
         self.assertIn("(գիծը՝ 0.5)", self.explain("OU_1H", "1st Half Over 0.5"))
-        ah = self.explain("ASIAN_HANDICAP", "A −1 (Asian Handicap)", ["AH −1: win 41%, push 22%"])
-        self.assertIn("41%", ah)
-        self.assertIn("22%", ah)
         mw = self.explain("MATCH_WINNER", "A (Home Win)")
         for fact in ("ձև", "3/5", "1.8"):
             self.assertIn(fact, mw)

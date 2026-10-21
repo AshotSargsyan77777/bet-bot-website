@@ -70,7 +70,7 @@ function bookmaker(name, f) {
     bet('Corners 1x2', [['Home', 1.7]]),
   ] };
 }
-const oddsResp = select.map((s) => ({ json: { parameters: { fixture: String(s.json.fixture_id) }, response: [{ bookmakers: ['William Hill', 'Bet365', 'Unibet', '1xBet'].map((n) => bookmaker(n)) }] } }));
+const oddsResp = select.map((s) => ({ json: { parameters: { fixture: String(s.json.fixture_id) }, response: [{ bookmakers: ['Bet365', 'William Hill', '1Win', '1xBet'].map((n) => bookmaker(n)) }] } }));
 const seasonLg = () => ({ form: 'WWDLW', fixtures: { played: { home: 6, away: 6, total: 12 } },
   goals: { for: { average: { home: (1 + rnd() * 1.5).toFixed(1), away: (0.8 + rnd()).toFixed(1), total: '1.5' } }, against: { average: { home: (0.6 + rnd()).toFixed(1), away: (0.9 + rnd()).toFixed(1), total: '1.2' } } },
   clean_sheet: { home: 2, away: 1, total: 3 }, failed_to_score: { home: 1, away: 2, total: 3 },
@@ -79,7 +79,7 @@ const seasonLg = () => ({ form: 'WWDLW', fixtures: { played: { home: 6, away: 6,
 (async () => {
   await run('Code in JavaScript2', 'parse_odds.js', oddsResp);
   const o = outputs['Code in JavaScript2'][0].json;
-  console.log('  markets:', [...new Set(o.odds.map((x) => x.market))].join(','), '| unmapped:', o.unmappedCornerCardBets);
+  console.log('  markets:', [...new Set(o.odds.map((x) => x.market))].join(','), '| bookmaker:', o.bookmaker, '| available:', o.availableBookmakers.join(','));
   await run('Prepare Predictions', 'prepare_predictions.js', outputs['Code in JavaScript2']);
   const predResp = outputs['Prepare Predictions'].map((it) => {
     const [h, hn, a, an] = teams.find((t) => t[1] === it.json.homeTeam);

@@ -1,4 +1,5 @@
-const TARGET_BOOKMAKER_NAME = 'William Hill';
+// Գործակիցների աղբյուրը. առաջինը 1win (եթե API-Football-ը տալիս է), հակառակ դեպքում William Hill
+const PREFERRED_BOOKMAKERS = ['1win', 'william hill'];
 const MAX_BOOKS = 15;
 
 const norm = (s) => String(s || '').toLowerCase().replace(/\s+/g, ' ').trim();
@@ -17,7 +18,6 @@ const MARKET_MAP = {
   'clean sheet - away': 'CLEAN_SHEET_AWAY',
   'win to nil - home': 'WIN_TO_NIL_HOME',
   'win to nil - away': 'WIN_TO_NIL_AWAY',
-  'asian handicap': 'ASIAN_HANDICAP',
 };
 
 // ՆՈՐ: corners / cards շուկաները բուքմեյքերները տարբեր անուններով են գրում, ճանաչում ենք ըստ բառերի
@@ -52,10 +52,13 @@ const marketOf = (bet) => MARKET_MAP[norm(bet.name)] || patternMarket(bet.name);
 const mappedCount = (b) => (b.bets || []).filter(marketOf).length;
 const hasMatchWinner = (b) => (b.bets || []).some((bet) => marketOf(bet) === 'MATCH_WINNER');
 
+const bookKey = (name) => norm(name).replace(/[^a-z0-9]/g, '');
 function pickBookmaker(list) {
   const arr = list || [];
-  const wh = arr.find((b) => b.name === TARGET_BOOKMAKER_NAME);
-  if (wh && hasMatchWinner(wh)) return wh;
+  for (const wanted of PREFERRED_BOOKMAKERS) {
+    const b = arr.find((x) => bookKey(x.name) === bookKey(wanted));
+    if (b && hasMatchWinner(b)) return b;
+  }
   const withMW = arr.filter(hasMatchWinner);
   const pool = withMW.length ? withMW : arr;
   return pool.slice().sort((a, b) => mappedCount(b) - mappedCount(a))[0] || null;
@@ -75,7 +78,7 @@ function flatten(bookmaker) {
 }
 
 // Նախընտրած բուքմեյքերը կարող է corners/cards չունենալ. այդ շուկաները լրացնում ենք այլ բուքմեյքերից
-const EXTRA_MARKETS = ['CORNERS_OU', 'CORNERS_HOME', 'CORNERS_AWAY', 'CARDS_OU', 'ASIAN_HANDICAP'];
+const EXTRA_MARKETS = ['CORNERS_OU', 'CORNERS_HOME', 'CORNERS_AWAY', 'CARDS_OU'];
 function fillMissingMarkets(preferredOdds, bookmakers) {
   const have = new Set(preferredOdds.map((o) => o.market));
   const out = preferredOdds.slice();
@@ -126,6 +129,8 @@ for (const item of $input.all()) {
       odds: fillMissingMarkets(flatten(preferred), bookmakers),
       books,
       betNames: (preferred?.bets || []).map((b) => b.name),
+      // ստուգման համար. API-Football-ի տված բոլոր բուքմեյքերները (1win-ը կա՞)
+      availableBookmakers: bookmakers.map((b) => b.name),
       // ստուգման համար. corners/cards անունները, որոնք չճանաչվեցին
       unmappedCornerCardBets: allBetNames.filter((n) => /corner|card|booking/i.test(n) && !marketOf({ name: n })),
     },

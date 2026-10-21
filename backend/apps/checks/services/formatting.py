@@ -17,7 +17,6 @@ MARKET_EMOJI = {
     "CLEAN_SHEET_AWAY": "🧤",
     "WIN_TO_NIL_HOME": "💪",
     "WIN_TO_NIL_AWAY": "💪",
-    "ASIAN_HANDICAP": "⚖️",
     "CORNERS_OU": "🚩",
     "CORNERS_HOME": "🚩",
     "CORNERS_AWAY": "🚩",
@@ -100,19 +99,13 @@ def explain_selection(s: dict[str, Any]) -> str:
         if exp and line:
             return f"Թիմերի կարգապահությամբ սպասվում է ~{exp[0]} քարտ (գիծը՝ {line})։"
 
-    if market == "ASIAN_HANDICAP":
-        m = re.search(r"AH\s+[^:]+:\s*win\s+(\d+)%(?:,\s*push\s+(\d+)%)?", reasons)
-        if m and m.group(2):
-            return f"Հաղթանակ՝ ~{m.group(1)}%, գումարի վերադարձ՝ ~{m.group(2)}%։"
-
     if market == "DNB":
         name = re.sub(r"^Draw No Bet\s*—\s*", "", sel)
         return f"Ոչ-ոքիի դեպքում գումարը վերադարձվում է. {name}-ը ֆավորիտ է։"
 
-    if market in ("MATCH_WINNER", "DOUBLE_CHANCE", "ASIAN_HANDICAP"):
+    if market in ("MATCH_WINNER", "DOUBLE_CHANCE"):
         name = re.sub(r"\s*\((Home|Away) Win\)$", "", sel)
         name = re.sub(r" or Draw$", "", name)
-        name = re.sub(r"\s*[+−-]?\d+(?:\.\d+)?\s*\(Asian Handicap\)$", "", name)
         is_home = name == home_name or "(Home Win)" in sel
         facts: list[str] = []
         if form:
