@@ -1,7 +1,9 @@
-type StatsPayload = {
+export type StatsPayload = {
   promo?: { free?: number; used?: number };
   active_subscriptions?: number;
   vip_members?: number;
+  pending_payments?: number;
+  unread_support?: number;
   checks_date?: string | null;
   ready_packages?: string[];
   today?: string;
@@ -11,6 +13,8 @@ export function AdminStatsGrid({ data }: { data?: StatsPayload | null }) {
   if (!data) return <p className="muted">Բեռնվում է…</p>;
 
   const cards = [
+    { label: "Pending վճարումներ", value: data.pending_payments ?? 0 },
+    { label: "Նոր հարցեր", value: data.unread_support ?? 0 },
     { label: "Պրոմո ազատ", value: data.promo?.free ?? 0 },
     { label: "Պրոմո օգտ.", value: data.promo?.used ?? 0 },
     { label: "Ակտիվ չեկեր", value: data.active_subscriptions ?? 0 },

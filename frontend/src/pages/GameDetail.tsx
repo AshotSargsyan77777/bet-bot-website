@@ -1,71 +1,115 @@
 import { useQuery } from "@tanstack/react-query";
-import { useParams, Link } from "react-router-dom";
+import { useState } from "react";
+import { Link, useParams } from "react-router-dom";
 import { api } from "../api/client";
-import { DemoBanner } from "../components/DemoBanner";
 import { PageHeader } from "../components/PageHeader";
 import { H2HList } from "../components/stats/H2HList";
 import { TeamFormPanel } from "../components/stats/TeamFormPanel";
-import { demoGameDetails, demoGames } from "../data/demo";
 import type { H2HMatch, TeamForm } from "../types/form";
-import { isDemoFixtureId } from "../utils/mergeDemo";
+import { LIVE_STATUSES } from "../types/game";
 
 type DetailPayload = {
-  home_form?: TeamForm;
-  away_form?: TeamForm;
-  h2h?: H2HMatch[];
+  fixture_id: number;
+  league: string;
+  home: string;
+  away: string;
+  cached: { kickoff: string | null; status: string | null; score: [number | null, number | null] | null };
+  home_form?: TeamForm | null;
+  away_form?: TeamForm | null;
+  h2h?: H2HMatch[] | null;
+  stats_error?: string | null;
   live?: {
-    goals?: { home?: number; away?: number };
-    fixture?: { status?: { short?: string; elapsed?: number } };
-  };
+    goals?: { home?: number | null; away?: number | null };
+    fixture?: { date?: string; status?: { short?: string; elapsed?: number | null } };
+  } | null;
 };
+
+type Venue = "all" | "home" | "away";
 
 export function GameDetail() {
   const { id } = useParams<{ id: string }>();
-  const fixtureId = Number(id);
-  const demoGame = demoGames.find((g) => g.id === fixtureId);
-  const isDemo = isDemoFixtureId(fixtureId);
+  const [lastN, setLastN] = useState(5);
+  const [homeVenue, setHomeVenue] = useState<Venue>("all");
+  const [awayVenue, setAwayVenue] = useState<Venue>("all");
+  const valid = !!id && /^\d+$/.test(id);
 
-  const { data, isFetching } = useQuery({
-    queryKey: ["game", id],
-    queryFn: () => api<DetailPayload>(`/api/games/${id}/`),
-    enabled: !!id && !isDemo,
+  const { data, isFetching, isLoading, isError, error } = useQuery({
+    queryKey: ["game", id, lastN, homeVenue, awayVenue],
+    queryFn: () =>
+      api<DetailPayload>(`/api/games/${id}/?last_n=${lastN}&home_venue=${homeVenue}&away_venue=${awayVenue}`),
+    enabled: valid,
     retry: false,
-    refetchInterval: 60000,
+    refetchInterval: (q) => (LIVE_STATUSES.includes(q.state.data?.live?.fixture?.status?.short ?? "") ? 60000 : false),
   });
 
-  const demoDetail = demoGameDetails[fixtureId] as DetailPayload | undefined;
-  const payload = (isDemo && demoDetail ? demoDetail : data) as DetailPayload | undefined;
-  const live = payload?.live;
-  const goals = live?.goals ?? {};
-  const statusShort = live?.fixture?.status?.short ?? demoGame?.status;
-  const elapsed = live?.fixture?.status?.elapsed;
-
-  if (!payload && !demoGame && isFetching) {
-    return <div className="loading-shimmer" />;
+  if (!valid) return <p className="field__error">Սխալ հղում</p>;
+  if (isLoading) return <div className="loading-shimmer" />;
+  if (isError || !data) {
+    return (
+      <div className="card">
+        <PageHeader title="Խաղ" />
+        <p className="field__error">{error?.message ?? "Խաղը չի գտնվել"}</p>
+        <Link to="/games" className="btn btn--secondary">← Ետ խաղեր</Link>
+      </div>
+    );
   }
 
-  const title = demoGame ? `${demoGame.home} — ${demoGame.away}` : `Մատչ #${id}`;
+  const goals = data.live?.goals ?? {};
+  const statusShort = data.live?.fixture?.status?.short ?? data.cached.status ?? "";
+  const elapsed = data.live?.fixture?.status?.elapsed;
+  const kickoff = data.live?.fixture?.date ?? data.cached.kickoff;
+  const scoreHome = goals.home ?? data.cached.score?.[0];
+  const scoreAway = goals.away ?? data.cached.score?.[1];
 
   return (
     <div>
-      {isDemo && <DemoBanner />}
-      <PageHeader eyebrow={demoGame?.league ?? "Match"} title={title} />
+      <PageHeader eyebrow={data.league || "Match"} title={`${data.home} — ${data.away}`} />
       <div className="match-hero">
-        {["LIVE", "1H", "2H", "HT"].includes(statusShort ?? "") && (
+        {LIVE_STATUSES.includes(statusShort) && (
           <p className="match-hero__live"><span className="live-dot" /> LIVE {elapsed != null ? `${elapsed}'` : ""}</p>
         )}
         <p className="muted">{statusShort}</p>
         <div className="match-hero__score">
-          {goals.home ?? demoGame?.score[0] ?? "—"} : {goals.away ?? demoGame?.score[1] ?? "—"}
+          {scoreHome ?? "—"} : {scoreAway ?? "—"}
         </div>
-        <p className="muted">{demoGame?.league}</p>
+        <p className="muted">
+          {data.league}
+          {kickoff ? ` · ${new Date(kickoff).toLocaleString([], { dateStyle: "medium", timeStyle: "short" })}` : ""}
+        </p>
       </div>
-      {isFetching && !isDemo && <p className="muted">Live թարմացում…</p>}
+      <div className="card card--glass">
+        <div className="filters">
+          <div className="field">
+            <span className="field__label">Վերջին խաղեր</span>
+            <select value={lastN} onChange={(e) => setLastN(Number(e.target.value))}>
+              {[3, 5, 10].map((n) => <option key={n} value={n}>{n}</option>)}
+            </select>
+          </div>
+          <div className="field">
+            <span className="field__label">Տան թիմ</span>
+            <select value={homeVenue} onChange={(e) => setHomeVenue(e.target.value as Venue)}>
+              <option value="all">Բոլոր խաղերը</option>
+              <option value="home">Միայն տանը</option>
+              <option value="away">Միայն արտագնա</option>
+            </select>
+          </div>
+          <div className="field">
+            <span className="field__label">Հյուր թիմ</span>
+            <select value={awayVenue} onChange={(e) => setAwayVenue(e.target.value as Venue)}>
+              <option value="all">Բոլոր խաղերը</option>
+              <option value="home">Միայն տանը</option>
+              <option value="away">Միայն արտագնա</option>
+            </select>
+          </div>
+        </div>
+      </div>
+      {isFetching && <p className="muted">Թարմացում…</p>}
+      {data.stats_error && <p className="field__error">{data.stats_error}</p>}
       <div className="grid" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))" }}>
-        <TeamFormPanel title="Տուն — վերջին 5" form={payload?.home_form} />
-        <TeamFormPanel title="Հյուր — վերջին 5" form={payload?.away_form} />
+        <TeamFormPanel title={`Տուն — վերջին ${lastN}`} form={data.home_form} />
+        <TeamFormPanel title={`Հյուր — վերջին ${lastN}`} form={data.away_form} />
       </div>
-      <H2HList matches={payload?.h2h ?? []} />
+      <H2HList matches={data.h2h ?? []} />
       <Link to="/games" className="btn btn--secondary" style={{ marginTop: "1rem" }}>← Ետ խաղեր</Link>
     </div>
   );

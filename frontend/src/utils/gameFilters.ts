@@ -1,48 +1,34 @@
-import type { GameRow } from "../types/game";
-
 export type GameFilters = {
+  date: string;
   q: string;
-  status: "" | "live" | "upcoming";
+  status: "" | "live" | "upcoming" | "finished";
   sort: "kickoff" | "form_diff";
-  minHomeWinPct: number | null;
+  minHomeWinPct: string;
   league: string;
 };
 
 export const emptyGameFilters: GameFilters = {
+  date: "",
   q: "",
   status: "",
   sort: "kickoff",
-  minHomeWinPct: null,
+  minHomeWinPct: "",
   league: "",
 };
 
-const LIVE = ["1H", "2H", "HT", "ET", "P", "LIVE"];
-
-export function applyGameFilters(games: GameRow[], f: GameFilters): GameRow[] {
-  let list = [...games];
-  const q = f.q.trim().toLowerCase();
-  if (q) {
-    list = list.filter((g) => `${g.home} ${g.away} ${g.league}`.toLowerCase().includes(q));
+/** Filters are applied server-side (/api/games/), this only builds the query string. */
+export function gameQueryParams(f: GameFilters, page: number, pageSize: number): URLSearchParams {
+  const params = new URLSearchParams();
+  if (f.date) params.set("date", f.date);
+  if (f.q.trim()) params.set("q", f.q.trim());
+  if (f.status) params.set("status", f.status);
+  if (f.league) params.set("league", f.league);
+  if (f.sort !== "kickoff") params.set("sort", f.sort);
+  const minWin = Number(f.minHomeWinPct);
+  if (f.minHomeWinPct.trim() !== "" && Number.isFinite(minWin)) {
+    params.set("min_win_pct", String(Math.min(100, Math.max(0, minWin))));
   }
-  if (f.league) {
-    list = list.filter((g) => g.league === f.league);
-  }
-  if (f.status === "live") {
-    list = list.filter((g) => LIVE.includes(g.status));
-  } else if (f.status === "upcoming") {
-    list = list.filter((g) => !LIVE.includes(g.status) && g.status !== "FT");
-  }
-  if (f.minHomeWinPct != null && !Number.isNaN(f.minHomeWinPct)) {
-    list = list.filter((g) => (g.home_form?.win_pct ?? 0) >= f.minHomeWinPct!);
-  }
-  if (f.sort === "form_diff") {
-    list.sort((a, b) => (b.form_diff ?? 0) - (a.form_diff ?? 0));
-  } else {
-    list.sort((a, b) => new Date(a.kickoff).getTime() - new Date(b.kickoff).getTime());
-  }
-  return list;
-}
-
-export function uniqueLeagues(games: GameRow[]): string[] {
-  return [...new Set(games.map((g) => g.league).filter(Boolean))].sort();
+  params.set("page", String(page));
+  params.set("page_size", String(pageSize));
+  return params;
 }

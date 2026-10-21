@@ -1,107 +1,90 @@
-import { useQuery } from "@tanstack/react-query";
-import { useMemo, useState } from "react";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
+import { useState } from "react";
 import { api } from "../api/client";
-import { DemoBanner } from "../components/DemoBanner";
 import { GameCard } from "../components/GameCard";
 import { PageHeader } from "../components/PageHeader";
 import { useDebouncedValue } from "../hooks/useDebouncedValue";
-import type { GameRow } from "../types/game";
-import {
-  applyGameFilters,
-  uniqueLeagues,
-  type GameFilters,
-} from "../utils/gameFilters";
-import { mergeGames } from "../utils/mergeDemo";
+import { LIVE_STATUSES, type GamesResponse } from "../types/game";
+import { emptyGameFilters, gameQueryParams, type GameFilters } from "../utils/gameFilters";
+
+const PAGE_SIZE = 24;
 
 export function Games() {
-  const [date, setDate] = useState("");
-  const [q, setQ] = useState("");
-  const [status, setStatus] = useState<GameFilters["status"]>("");
-  const [sort, setSort] = useState<GameFilters["sort"]>("kickoff");
-  const [minWinStr, setMinWinStr] = useState("");
-  const [league, setLeague] = useState("");
+  const [filters, setFilters] = useState<GameFilters>(emptyGameFilters);
+  const [page, setPage] = useState(1);
 
-  const debouncedQ = useDebouncedValue(q, 300);
+  const debouncedQ = useDebouncedValue(filters.q, 300);
+  const debouncedMinWin = useDebouncedValue(filters.minHomeWinPct, 400);
+  const effective = { ...filters, q: debouncedQ, minHomeWinPct: debouncedMinWin };
+  const params = gameQueryParams(effective, page, PAGE_SIZE).toString();
 
-  const { data, isFetching, isError } = useQuery({
-    queryKey: ["games", date],
-    queryFn: () => {
-      const params = new URLSearchParams();
-      if (date) params.set("date", date);
-      return api<{ games: GameRow[]; date: string }>(`/api/games/?${params}`);
-    },
-    retry: false,
-    enabled: true,
+  const { data, isFetching, isError, error, isLoading } = useQuery({
+    queryKey: ["games", params],
+    queryFn: () => api<GamesResponse>(`/api/games/?${params}`),
+    placeholderData: keepPreviousData,
     refetchInterval: (query) => {
-      const games = query.state.data?.games || [];
-      const live = games.some((g) => ["1H", "2H", "HT", "LIVE"].includes(g.status));
-      return live ? 60000 : 300000;
+      const games = query.state.data?.results || [];
+      return games.some((g) => LIVE_STATUSES.includes(g.status)) ? 60000 : 300000;
     },
   });
 
-  const { games: rawGames, showDemoBanner } = mergeGames(isError ? undefined : data?.games);
-
-  const filters: GameFilters = useMemo(
-    () => ({
-      q: debouncedQ,
-      status,
-      sort,
-      league,
-      minHomeWinPct: minWinStr.trim() === "" ? null : Number(minWinStr),
-    }),
-    [debouncedQ, status, sort, league, minWinStr]
-  );
-
-  const sorted = useMemo(() => applyGameFilters(rawGames, filters), [rawGames, filters]);
-  const leagues = useMemo(() => uniqueLeagues(rawGames), [rawGames]);
+  const update = <K extends keyof GameFilters>(key: K, value: GameFilters[K]) => {
+    setFilters((f) => ({ ...f, [key]: value }));
+    setPage(1);
+  };
 
   const resetFilters = () => {
-    setQ("");
-    setStatus("");
-    setSort("kickoff");
-    setMinWinStr("");
-    setLeague("");
-    setDate("");
+    setFilters(emptyGameFilters);
+    setPage(1);
   };
+
+  const games = data?.results ?? [];
+  const leagues = data?.leagues ?? [];
 
   return (
     <div>
       <PageHeader
         eyebrow="API-Football"
         title="⚽ Խաղեր և վիճակագրություն"
-        subtitle="Ֆիլտրերը աշխատում են նաև demo ռեժիմում, մինչ API բանալին միացնեք։"
+        subtitle={data ? `Ամսաթիվ: ${data.date}` : "Ֆիլտրեր ըստ լիգայի, կարգավիճակի և ձևի"}
       />
-      {showDemoBanner && <DemoBanner />}
+      {data && !data.provider_configured && (
+        <p className="field__error">
+          Խաղերի տվյալների մատակարարը (API-Football) դեռ կարգավորված չէ — ադմինը պետք է նշի API_FOOTBALL_KEY-ը։
+        </p>
+      )}
+      {data?.provider_error && <p className="field__error">Խաղերի թարմացումը ձախողվեց։ Փորձեք մի փոքր ուշ։</p>}
       <div className="card card--glass">
         <div className="filters">
           <div className="field">
             <span className="field__label">Ամսաթիվ</span>
-            <input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+            <input type="date" value={filters.date} onChange={(e) => update("date", e.target.value)} />
           </div>
           <div className="field">
             <span className="field__label">Որոնում</span>
-            <input type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Թիմ կամ լիգա" />
+            <input type="search" value={filters.q} onChange={(e) => update("q", e.target.value)} placeholder="Թիմ կամ լիգա" />
           </div>
           <div className="field">
             <span className="field__label">Լիգա</span>
-            <select value={league} onChange={(e) => setLeague(e.target.value)}>
+            <select value={filters.league} onChange={(e) => update("league", e.target.value)}>
               <option value="">Բոլորը</option>
               {leagues.map((l) => (
-                <option key={l} value={l}>{l}</option>
+                <option key={l.id} value={String(l.id)}>{l.name}</option>
               ))}
             </select>
           </div>
           <div className="field">
             <span className="field__label">Կարգավիճակ</span>
-            <select value={status} onChange={(e) => setStatus(e.target.value as GameFilters["status"])}>
+            <select value={filters.status} onChange={(e) => update("status", e.target.value as GameFilters["status"])}>
               <option value="">Բոլորը</option>
               <option value="live">Live</option>
               <option value="upcoming">Առաջիկա</option>
+              <option value="finished">Ավարտված</option>
             </select>
           </div>
           <div className="field">
             <span className="field__label">Տեսակավորում</span>
-            <select value={sort} onChange={(e) => setSort(e.target.value as GameFilters["sort"])}>
+            <select value={filters.sort} onChange={(e) => update("sort", e.target.value as GameFilters["sort"])}>
               <option value="kickoff">Ժամ</option>
               <option value="form_diff">Ձևի տարբերություն</option>
             </select>
@@ -112,26 +95,44 @@ export function Games() {
               type="number"
               min={0}
               max={100}
-              value={minWinStr}
-              onChange={(e) => setMinWinStr(e.target.value)}
+              value={filters.minHomeWinPct}
+              onChange={(e) => update("minHomeWinPct", e.target.value)}
               placeholder="օր. 50"
             />
           </div>
         </div>
         <div className="filters-toolbar">
           <span className="filters-count">
-            Ցուցադրված {sorted.length} / {rawGames.length}
+            Գտնվել է {data?.count ?? 0}
+            {data && data.form_pending > 0 ? ` · ${data.form_pending} խաղի ձևը դեռ հաշվարկվում է` : ""}
           </span>
           <button type="button" className="secondary" onClick={resetFilters}>Մաքրել ֆիլտրերը</button>
         </div>
-        {isFetching && !showDemoBanner && <div className="loading-shimmer" />}
+        {isFetching && <div className="loading-shimmer" />}
+        {isError && <p className="field__error">{error.message}</p>}
         <div className="games-grid">
-          {sorted.map((g) => (
+          {games.map((g) => (
             <GameCard key={g.id} game={g} />
           ))}
         </div>
-        {sorted.length === 0 && (
-          <p className="muted">Խաղեր չեն գտնվել — սեղմեք «Մաքրել ֆիլտրերը»։</p>
+        {!isLoading && !isError && games.length === 0 && (
+          <p className="muted">Խաղեր չեն գտնվել — փոխեք ամսաթիվը կամ սեղմեք «Մաքրել ֆիլտրերը»։</p>
+        )}
+        {data && data.total_pages > 1 && (
+          <div className="filters-toolbar" style={{ justifyContent: "center", marginTop: "1rem" }}>
+            <button type="button" className="secondary" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>
+              ← Նախորդ
+            </button>
+            <span className="filters-count">{data.page} / {data.total_pages}</span>
+            <button
+              type="button"
+              className="secondary"
+              disabled={page >= data.total_pages}
+              onClick={() => setPage((p) => p + 1)}
+            >
+              Հաջորդ →
+            </button>
+          </div>
         )}
       </div>
     </div>

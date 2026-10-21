@@ -1,61 +1,144 @@
 const API_BASE = import.meta.env.VITE_API_URL || "";
 
+const ACCESS_KEY = "access_token";
+const REFRESH_KEY = "refresh_token";
+
+export type Paginated<T> = {
+  count: number;
+  page: number;
+  page_size: number;
+  total_pages: number;
+  results: T[];
+};
+
+/** Error thrown for every non-2xx API response; `fields` holds per-field validation messages. */
+export class ApiError extends Error {
+  status: number;
+  code?: string;
+  fields?: Record<string, string[]>;
+
+  constructor(message: string, status: number, code?: string, fields?: Record<string, string[]>) {
+    super(message);
+    this.status = status;
+    this.code = code;
+    this.fields = fields;
+  }
+}
+
+function storage(): Storage | null {
+  try {
+    return window.localStorage;
+  } catch {
+    return null;
+  }
+}
+
 export function getToken(): string | null {
-  return localStorage.getItem("access_token");
+  return storage()?.getItem(ACCESS_KEY) ?? null;
+}
+
+export function getRefreshToken(): string | null {
+  return storage()?.getItem(REFRESH_KEY) ?? null;
 }
 
 export function setTokens(access: string, refresh?: string) {
-  localStorage.setItem("access_token", access);
-  if (refresh) localStorage.setItem("refresh_token", refresh);
+  storage()?.setItem(ACCESS_KEY, access);
+  if (refresh) storage()?.setItem(REFRESH_KEY, refresh);
 }
 
 export function clearTokens() {
-  localStorage.removeItem("access_token");
-  localStorage.removeItem("refresh_token");
+  storage()?.removeItem(ACCESS_KEY);
+  storage()?.removeItem(REFRESH_KEY);
 }
 
-export async function api<T>(
-  path: string,
-  options: RequestInit & { json?: unknown } = {}
-): Promise<T> {
-  const headers: Record<string, string> = {
-    ...(options.headers as Record<string, string>),
-  };
-  const token = getToken();
-  if (token) headers.Authorization = `Bearer ${token}`;
-  let body = options.body;
-  if (options.json !== undefined) {
-    headers["Content-Type"] = "application/json";
-    body = JSON.stringify(options.json);
+let refreshing: Promise<boolean> | null = null;
+
+/** Exchanges the refresh token for a new pair; concurrent callers share one request. */
+async function refreshAccessToken(): Promise<boolean> {
+  const refresh = getRefreshToken();
+  if (!refresh) return false;
+  if (!refreshing) {
+    refreshing = (async () => {
+      try {
+        const res = await fetch(`${API_BASE}/api/auth/token/refresh/`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ refresh }),
+        });
+        if (!res.ok) {
+          clearTokens();
+          return false;
+        }
+        const data = (await res.json()) as { access: string; refresh?: string };
+        setTokens(data.access, data.refresh);
+        return true;
+      } catch {
+        return false;
+      } finally {
+        refreshing = null;
+      }
+    })();
   }
+  return refreshing;
+}
+
+type RequestOptions = RequestInit & { json?: unknown; auth?: boolean };
+
+async function request(path: string, options: RequestOptions = {}, retry = true): Promise<Response> {
+  const { json, auth = true, ...init } = options;
+  const headers: Record<string, string> = { ...(init.headers as Record<string, string>) };
+  const token = auth ? getToken() : null;
+  if (token) headers.Authorization = `Bearer ${token}`;
+  let body = init.body;
+  if (json !== undefined) {
+    headers["Content-Type"] = "application/json";
+    body = JSON.stringify(json);
+  }
+
   let res: Response;
   try {
-    res = await fetch(`${API_BASE}${path}`, { ...options, headers, body });
+    res = await fetch(`${API_BASE}${path}`, { ...init, headers, body });
   } catch {
-    throw new Error(
-      "Չի հաջողվում միանալ սերվերին. Գործարկեք backend՝ cd backend, ապա python manage.py runserver (պորտ 8000)."
-    );
+    throw new ApiError("Չի հաջողվում միանալ սերվերին։ Ստուգեք ինտերնետ կապը և փորձեք նորից։", 0, "network");
   }
-  if (!res.ok) {
-    const text = await res.text();
-    if (res.status === 502 || res.status === 503 || /bad gateway/i.test(text)) {
-      throw new Error(
-        "API-ն չի աշխատում (Bad Gateway). Բացեք երկրորդ տերմինալում՝ cd backend && python manage.py runserver"
-      );
-    }
-    let err: Record<string, unknown> = {};
-    try {
-      err = JSON.parse(text) as Record<string, unknown>;
-    } catch {
-      throw new Error(text.slice(0, 200) || res.statusText);
-    }
-    const detail = err.detail;
-    if (typeof detail === "string") throw new Error(detail);
-    if (Array.isArray(detail)) throw new Error(detail.map(String).join(" "));
-    const username = err.username;
-    if (Array.isArray(username)) throw new Error(String(username[0]));
-    throw new Error(String(err.error || err.message || res.statusText));
+
+  if (res.status === 401 && token && retry && (await refreshAccessToken())) {
+    return request(path, options, false);
   }
+  if (res.status === 401 && token) {
+    clearTokens();
+    window.dispatchEvent(new Event("auth:logout"));
+  }
+  if (!res.ok) throw await toApiError(res);
+  return res;
+}
+
+async function toApiError(res: Response): Promise<ApiError> {
+  if (res.status === 502 || res.status === 504) {
+    return new ApiError("Սերվերը ժամանակավորապես անհասանելի է։ Փորձեք մի փոքր ուշ։", res.status, "unavailable");
+  }
+  const text = await res.text();
+  try {
+    const data = JSON.parse(text) as { error?: string; detail?: string; code?: string; fields?: Record<string, string[]> };
+    const message = data.error || data.detail || res.statusText || "Սխալ";
+    return new ApiError(String(message), res.status, data.code, data.fields);
+  } catch {
+    return new ApiError(res.status >= 500 ? "Սերվերի ներքին սխալ" : res.statusText || "Սխալ", res.status);
+  }
+}
+
+export async function api<T>(path: string, options: RequestOptions = {}): Promise<T> {
+  const res = await request(path, options);
   if (res.status === 204) return undefined as T;
   return res.json() as Promise<T>;
+}
+
+/** Authenticated binary download (e.g. private receipt images) as an object URL. */
+export async function apiBlobUrl(path: string): Promise<string> {
+  const res = await request(path);
+  return URL.createObjectURL(await res.blob());
+}
+
+export function errorMessage(err: unknown, fallback = "Սխալ"): string {
+  return err instanceof Error && err.message ? err.message : fallback;
 }

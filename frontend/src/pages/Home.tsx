@@ -1,27 +1,70 @@
+import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import heroImg from "../assets/hero.png";
+import { api } from "../api/client";
 import { GameCard } from "../components/GameCard";
-import {
-  demoCheckPreview,
-  demoCombinatorResults,
-  demoGames,
-  landingStats,
-} from "../data/demo";
+import type { GamesResponse } from "../types/game";
+import type { Catalog } from "../types/catalog";
 
-const marqueeItems = demoGames.map((g) => ({
-  key: g.id,
-  text: `${g.home} vs ${g.away}`,
-  score: g.score[0] != null ? `${g.score[0]}:${g.score[1]}` : "—",
-}));
+type Summary = {
+  today: string;
+  checks_date: string | null;
+  ready_packages: number;
+  total_packages: number;
+  games_today: number;
+  live_games: number;
+  games_provider_configured: boolean;
+};
+
+/** Illustrates the format of a check (static marketing example, not a real pick). */
+const SAMPLE_CHECK_FORMAT = `⚽ GOALKING ՉԵԿ
+🎯 Ընդհանուր գործակից՝ 3.12x
+━━━━━━━━━━━━━━
+
+1️⃣ 🏟 Թիմ A - Թիմ B
+🏆 Թիմ A (Home Win)
+💰 Գործակից՝ 1.60
+💡 Թիմ A-ն վերջին խաղերում ավելի լավ ձևի մեջ է։
+
+2️⃣ 🏟 Թիմ C - Թիմ D
+🥅 Both Teams To Score — Yes
+💰 Գործակից՝ 1.95
+
+━━━━━━━━━━━━━━`;
 
 export function Home() {
+  const summary = useQuery({
+    queryKey: ["summary"],
+    queryFn: () => api<Summary>("/api/summary/"),
+    refetchInterval: 120000,
+  });
+  const games = useQuery({
+    queryKey: ["home-games"],
+    queryFn: () => api<GamesResponse>("/api/games/?page_size=6"),
+    refetchInterval: 120000,
+  });
+  const catalog = useQuery({
+    queryKey: ["catalog"],
+    queryFn: () => api<Catalog>("/api/checks/catalog/"),
+  });
+
+  const gameList = games.data?.results ?? [];
+  const readyPkgs = (catalog.data?.packages ?? []).filter((p) => p.ready && p.key !== "pkg_vip");
+  const s = summary.data;
+  const stats = [
+    { label: "Պատրաստ չեկեր այսօր", value: s ? `${s.ready_packages}/${s.total_packages}` : "—" },
+    { label: "Այսօրվա խաղեր", value: s ? String(s.games_today) : "—" },
+    { label: "Live հիմա", value: s ? String(s.live_games) : "—" },
+    { label: "Չեկերի ամսաթիվ", value: s?.checks_date ?? "—" },
+  ];
+
   return (
     <div className="landing">
       <section className="hero">
         <div className="hero__bg" style={{ backgroundImage: `url(${heroImg})` }} aria-hidden />
         <div className="hero__mesh" aria-hidden />
         <div className="hero__content">
-          <p className="page-header__eyebrow animate-fade-in">Goalking · 2026</p>
+          <p className="page-header__eyebrow animate-fade-in">Goalking{s?.today ? ` · ${s.today.slice(0, 4)}` : ""}</p>
           <h1 className="hero__title animate-fade-in animate-delay-1">
             Օրվա <span className="gradient-text">չեկերը</span> և live վիճակագրություն
           </h1>
@@ -35,30 +78,46 @@ export function Home() {
             <Link to="/combinator" className="btn btn--secondary btn--lg">🎯 Կոնստրուկտոր</Link>
           </div>
           <div className="card card--glass hero__float-card">
-            <span className="pill pill--demo" style={{ position: "static", marginBottom: "0.5rem" }}>Demo</span>
-            <pre className="pre" style={{ margin: 0, maxHeight: 180, overflow: "hidden" }}>{demoCheckPreview}</pre>
+            <h3 style={{ marginTop: 0 }}>Այսօր հասանելի</h3>
+            {catalog.isLoading && <div className="loading-shimmer" />}
+            {catalog.isError && <p className="field__error">Չհաջողվեց բեռնել փաթեթները</p>}
+            {catalog.data && readyPkgs.length === 0 && (
+              <p className="muted">Այսօրվա չեկերը դեռ պատրաստ չեն — թարմացվում է ավտոմատ։</p>
+            )}
+            {readyPkgs.length > 0 && (
+              <ul className="match-list">
+                {readyPkgs.map((p) => (
+                  <li key={p.key}>
+                    ✅ {p.label}
+                    {p.combined_odds ? <> · <strong>{Number(p.combined_odds).toFixed(2)}x</strong></> : null}
+                  </li>
+                ))}
+              </ul>
+            )}
           </div>
         </div>
       </section>
 
       <div className="stats-row">
-        {landingStats.map((s) => (
-          <div key={s.label} className="stat-tile">
-            <div className="stat-tile__value">{s.value}</div>
-            <div className="stat-tile__label">{s.label}</div>
+        {stats.map((st) => (
+          <div key={st.label} className="stat-tile">
+            <div className="stat-tile__value">{st.value}</div>
+            <div className="stat-tile__label">{st.label}</div>
           </div>
         ))}
       </div>
 
-      <div className="marquee-wrap" aria-hidden>
-        <div className="marquee">
-          {[...marqueeItems, ...marqueeItems].map((item, i) => (
-            <span key={`${item.key}-${i}`} className="marquee__item">
-              <strong>{item.score}</strong> {item.text}
-            </span>
-          ))}
+      {gameList.length > 0 && (
+        <div className="marquee-wrap" aria-hidden>
+          <div className="marquee">
+            {[...gameList, ...gameList].map((g, i) => (
+              <span key={`${g.id}-${i}`} className="marquee__item">
+                <strong>{g.score[0] != null ? `${g.score[0]}:${g.score[1]}` : "—"}</strong> {g.home} vs {g.away}
+              </span>
+            ))}
+          </div>
         </div>
-      </div>
+      )}
 
       <section className="section">
         <h2 className="section__title">Ինչու Goalking</h2>
@@ -89,11 +148,18 @@ export function Home() {
 
       <section className="section">
         <h2 className="section__title">Live &amp; առաջիկա խաղեր</h2>
-        <p className="section__desc">
-          Ներքևում — demo տվյալներ API-ի նման։ Երբ միացնեք API-Football, նույն քարտերով կտեսնեք իրական խաղերը։
-        </p>
+        <p className="section__desc">Այսօրվա խաղերը API-Football-ից՝ վերջին 5 խաղի ձևով։</p>
+        {games.isLoading && <div className="loading-shimmer" />}
+        {games.isError && <p className="field__error">Չհաջողվեց բեռնել խաղերը</p>}
+        {games.data && gameList.length === 0 && (
+          <p className="muted">
+            {games.data.provider_configured
+              ? "Այսօր խաղեր դեռ չկան։"
+              : "Խաղերի տվյալները դեռ միացված չեն (API-Football)։"}
+          </p>
+        )}
         <div className="games-grid">
-          {demoGames.map((g) => (
+          {gameList.map((g) => (
             <GameCard key={g.id} game={g} />
           ))}
         </div>
@@ -104,28 +170,19 @@ export function Home() {
 
       <section className="section check-preview">
         <div>
-          <h2 className="section__title">Օրինակ չեկ</h2>
-          <p className="section__desc">Հայերեն բացատրություններով, ինչպես n8n-ից գալիս է բոտին։</p>
+          <h2 className="section__title">Չեկի ձևաչափը</h2>
+          <p className="section__desc">Հայերեն բացատրություններով, ինչպես n8n-ից գալիս է բոտին։ Ներքևում՝ ձևաչափի օրինակ։</p>
           <Link to="/checks" className="btn">Դիտել կատալոգը</Link>
         </div>
-        <pre className="pre">{demoCheckPreview}</pre>
+        <pre className="pre">{SAMPLE_CHECK_FORMAT}</pre>
       </section>
 
       <section className="section">
-        <h2 className="section__title">Կոնստրուկտոր — նախադիտում</h2>
-        <p className="section__desc">Օրինակ հավելվածներ ընդհանուր ~10x գործակցով։</p>
-        {demoCombinatorResults.map((r, i) => (
-          <div key={i} className="combo-result">
-            <div className="combo-result__odds">{r.combined_odds}x</div>
-            <ul className="match-list">
-              {r.legs.map((leg, j) => (
-                <li key={j}>
-                  {leg.fixture_name} · {leg.market} · {leg.selection} @ {leg.odd}
-                </li>
-              ))}
-            </ul>
-          </div>
-        ))}
+        <h2 className="section__title">Կոնստրուկտոր</h2>
+        <p className="section__desc">
+          VIP անդամները կարող են կառուցել սեփական կոմբինացիաները օրվա ընտրանքներից՝ ըստ ցանկալի ընդհանուր
+          գործակցի և ողների քանակի։
+        </p>
         <Link to="/combinator" className="btn" style={{ marginTop: "1rem" }}>Բացել կոնստրուկտորը</Link>
       </section>
 

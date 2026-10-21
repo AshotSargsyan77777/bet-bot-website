@@ -1,10 +1,10 @@
 import { Link } from "react-router-dom";
-import type { GameRow } from "../types/game";
+import { LIVE_STATUSES, type GameRow } from "../types/game";
 import { FormBars } from "./FormBars";
 
 function statusClass(status: string) {
-  if (["LIVE", "1H", "2H", "HT"].includes(status)) return "game-card--live";
-  if (status === "FT") return "game-card--ft";
+  if (LIVE_STATUSES.includes(status)) return "game-card--live";
+  if (["FT", "AET", "PEN"].includes(status)) return "game-card--ft";
   return "game-card--upcoming";
 }
 
@@ -17,8 +17,7 @@ export function GameCard({ game, compact }: { game: GameRow; compact?: boolean }
 
   return (
     <article className={`game-card ${statusClass(game.status)} ${compact ? "game-card--compact" : ""}`}>
-      {game.is_demo && <span className="pill pill--demo">Demo</span>}
-      {["LIVE", "1H", "2H", "HT"].includes(game.status) && (
+      {LIVE_STATUSES.includes(game.status) && (
         <span className="pill pill--live"><span className="live-dot" /> LIVE</span>
       )}
       <header className="game-card__league">{game.league}</header>

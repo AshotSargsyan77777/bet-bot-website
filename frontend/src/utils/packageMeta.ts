@@ -1,0 +1,19 @@
+/** Presentation-only metadata for the fixed package catalogue (prices/availability come from the API). */
+export const packageMeta: Record<string, { multiplier: string; tier: "standard" | "hot" | "elite" | "cl" | "vip" | "promo" }> = {
+  standard_3x: { multiplier: "3x", tier: "standard" },
+  standard_5x: { multiplier: "5x", tier: "standard" },
+  standard_10x: { multiplier: "10x", tier: "hot" },
+  standard_20x: { multiplier: "20x", tier: "elite" },
+  champions_3x: { multiplier: "CL 3x", tier: "cl" },
+  champions_5x: { multiplier: "CL 5x", tier: "cl" },
+  champions_10x: { multiplier: "CL 10x", tier: "cl" },
+  pkg_vip: { multiplier: "VIP", tier: "vip" },
+  promo_5x: { multiplier: "Promo", tier: "promo" },
+  pkg_5: { multiplier: "Promo", tier: "promo" },
+};
+
+export const paymentStatusLabel: Record<string, string> = {
+  pending: "⏳ Սպասում է հաստատման",
+  approved: "✅ Հաստատված",
+  rejected: "❌ Մերժված",
+};
