@@ -1,3 +1,4 @@
+# Local development stack: PostgreSQL + Redis + Django (runserver) + Celery + Vite.
 services:
   postgres:
     image: postgres:16-alpine
@@ -9,6 +10,10 @@ services:
       - "5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U goalking"]
+      interval: 5s
+      retries: 10
 
   redis:
     image: redis:7-alpine
@@ -17,48 +22,63 @@ services:
 
   backend:
     build: ./backend
-    command: python manage.py runserver 0.0.0.0:8000
+    command: sh -c "python manage.py migrate && python manage.py runserver 0.0.0.0:8000"
+    user: root
     volumes:
       - ./backend:/app
     ports:
       - "8000:8000"
-    environment:
-      USE_SQLITE: "0"
-      USE_LOCMEM_CACHE: "0"
+    env_file:
+      - path: .env
+        required: false
+    environment: &backend-env
+      DJANGO_DEBUG: "1"
       POSTGRES_HOST: postgres
+      POSTGRES_PASSWORD: goalking
       REDIS_URL: redis://redis:6379/1
       CELERY_BROKER_URL: redis://redis:6379/0
-      DJANGO_DEBUG: "1"
       DJANGO_ALLOWED_HOSTS: localhost,127.0.0.1,backend
       CORS_ORIGINS: http://localhost:5173,http://127.0.0.1:5173
     depends_on:
-      - postgres
-      - redis
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
 
   celery:
     build: ./backend
     command: celery -A config worker -l info
     volumes:
       - ./backend:/app
-    environment:
-      USE_SQLITE: "0"
-      USE_LOCMEM_CACHE: "0"
-      POSTGRES_HOST: postgres
-      CELERY_BROKER_URL: redis://redis:6379/0
+    env_file:
+      - path: .env
+        required: false
+    environment: *backend-env
     depends_on:
-      - postgres
-      - redis
+      - backend
+
+  celery-beat:
+    build: ./backend
+    command: celery -A config beat -l info --schedule /tmp/celerybeat-schedule
+    volumes:
+      - ./backend:/app
+    env_file:
+      - path: .env
+        required: false
+    environment: *backend-env
+    depends_on:
+      - backend
 
   frontend:
-    image: node:24-alpine
+    image: node:22-alpine
     working_dir: /app
     volumes:
       - ./frontend:/app
-    command: sh -c "npm install && npm run dev -- --host 0.0.0.0"
+    command: sh -c "npm ci && npm run dev -- --host 0.0.0.0"
     ports:
       - "5173:5173"
     environment:
-      VITE_API_URL: http://localhost:8000
+      API_PROXY_TARGET: http://backend:8000
 
 volumes:
   pgdata:
