@@ -1,3 +1,4 @@
+import math
 import re
 from typing import Any
 
@@ -33,7 +34,7 @@ def _num(reasons: str, pattern: str) -> list[float] | None:
 
 
 def _line(sel: str) -> str | None:
-    m = re.search(r"(\d+(?:\.\d+)?)", sel)
+    m = re.search(r"(?:Over|Under)\s+(\d+(?:\.\d+)?)", sel, re.I)
     return m.group(1) if m else None
 
 
@@ -157,7 +158,7 @@ def format_package(pkg: dict[str, Any]) -> str:
                     rows.append(f"💡 {why}")
                 prob = s.get("probability")
                 if isinstance(prob, (int, float)) and 0 < prob <= 1:
-                    rows.append(f"📊 Հավանականություն՝ {round(prob * 100)}%")
+                    rows.append(f"📊 Հավանականություն՝ {math.floor(prob * 100 + 0.5)}%")
             blocks.append("\n".join(rows))
         return "\n\n".join(blocks)
 
