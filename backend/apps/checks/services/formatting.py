@@ -16,6 +16,11 @@ MARKET_EMOJI = {
     "CLEAN_SHEET_AWAY": "🧤",
     "WIN_TO_NIL_HOME": "💪",
     "WIN_TO_NIL_AWAY": "💪",
+    "ASIAN_HANDICAP": "⚖️",
+    "CORNERS_OU": "🚩",
+    "CORNERS_HOME": "🚩",
+    "CORNERS_AWAY": "🚩",
+    "CARDS_OU": "🟨",
 }
 LINE = "━━━━━━━━━━━━━━"
 
@@ -107,6 +112,36 @@ def explain_selection(s: dict[str, Any]) -> str:
         if yes:
             return f"{opp}-ի ակնկալվող գոլերը ցածր են ({ox}), ուստի {team}-ը կարող է մնալ առանց բաց թողնված գոլի։"
         return f"{opp}-ից ակնկալվում է ~{ox} գոլ, ուստի {team}-ի դարպասը անխախտ մնալը քիչ հավանական է։"
+
+    if market in ("CORNERS_OU", "CORNERS_HOME", "CORNERS_AWAY"):
+        exp = _num(reasons, r"Corners exp\s+([\d.]+)\s+\(home\s+([\d.]+)\s*/\s*away\s+([\d.]+)\)")
+        lm = re.search(r"(Over|Under)\s+(\d+(?:\.\d+)?)", sel, re.I)
+        if not exp or not lm:
+            return ""
+        if market == "CORNERS_OU":
+            head = f"Թիմերի վերջին խաղերով սպասվում է ~{exp[0]} անկյունային (գիծը՝ {lm.group(2)})"
+        else:
+            team_exp = exp[1] if market == "CORNERS_HOME" else exp[2]
+            team = home_name if market == "CORNERS_HOME" else away_name
+            head = f"{team}-ից սպասվում է ~{team_exp} անկյունային (գիծը՝ {lm.group(2)})"
+        return f"{head}, հավանականությունը՝ ~{p}%։" if p is not None else f"{head}։"
+
+    if market == "CARDS_OU":
+        exp = _num(reasons, r"Cards exp\s+([\d.]+)")
+        lm = re.search(r"(Over|Under)\s+(\d+(?:\.\d+)?)", sel, re.I)
+        if not exp or not lm:
+            return ""
+        head = f"Թիմերի կարգապահության ցուցանիշներով սպասվում է ~{exp[0]} քարտ (գիծը՝ {lm.group(2)})"
+        return f"{head}, հավանականությունը՝ ~{p}%։" if p is not None else f"{head}։"
+
+    if market == "ASIAN_HANDICAP":
+        m = re.search(r"AH\s+[^:]+:\s*win\s+(\d+)%(?:,\s*push\s+(\d+)%)?", reasons)
+        if not m:
+            return f"Մոդելը այս ելքին տալիս է ~{p}% հավանականություն։" if p is not None else ""
+        text = f"Մոդելով այս handicap-ով հաղթանակի հավանականությունը ~{m.group(1)}% է"
+        if m.group(2):
+            text += f", գումարի վերադարձի՝ ~{m.group(2)}%"
+        return text + "։"
 
     if market == "ODD_EVEN":
         return f"Մոդելը այս ելքին տալիս է ~{p}% հավանականություն։" if p is not None else ""

@@ -93,3 +93,39 @@ class WebhookAndCatalogTests(APITestCase):
         r = self.client.patch("/api/admin/checks/", {"package_key": "standard_10x", "body_text": "Manual check"}, format="json")
         self.assertEqual(r.status_code, 200)
         self.assertTrue(r.data["ready"])
+
+
+class NewMarketExplanationTests(SimpleTestCase):
+    def test_corners_cards_handicap(self):
+        from apps.checks.services.formatting import explain_selection
+
+        corners = explain_selection({
+            "fixture": "A - B", "market": "CORNERS_OU", "selection": "Corners Over 9.5", "probability": 0.64,
+            "reasons": ["Corners over 9.5: 66%", "Corners exp 10.9 (home 5.6 / away 5.3)"],
+        })
+        self.assertIn("10.9", corners)
+        self.assertIn("64%", corners)
+        team = explain_selection({
+            "fixture": "A - B", "market": "CORNERS_AWAY", "selection": "B Corners Over 4.5",
+            "reasons": ["Corners exp 10.9 (home 5.6 / away 5.3)"],
+        })
+        self.assertIn("B-", team)
+        self.assertIn("5.3", team)
+        cards = explain_selection({
+            "fixture": "A - B", "market": "CARDS_OU", "selection": "Cards Over 3.5", "probability": 0.6,
+            "reasons": ["Cards over 3.5: 61%", "Cards exp 4.2 (home 2.0 / away 2.2)"],
+        })
+        self.assertIn("4.2", cards)
+        ah = explain_selection({
+            "fixture": "A - B", "market": "ASIAN_HANDICAP", "selection": "A −1 (Asian Handicap)",
+            "reasons": ["AH −1: win 41%, push 22%", "xG 1.80/0.90"],
+        })
+        self.assertIn("41%", ah)
+        self.assertIn("22%", ah)
+        text = format_package({"combined_odds": 3.1, "selections": [
+            {"fixture": "A - B", "market": "CORNERS_OU", "selection": "Corners Over 9.5", "odd": 1.8,
+             "reasons": ["Corners exp 10.9 (home 5.6 / away 5.3)"]},
+            {"fixture": "C - D", "market": "CARDS_OU", "selection": "Cards Over 3.5", "odd": 1.7, "reasons": []},
+        ]})
+        self.assertIn("🚩", text)
+        self.assertIn("🟨", text)

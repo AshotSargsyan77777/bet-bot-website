@@ -14,6 +14,11 @@ MARKETS = [
     "CLEAN_SHEET_AWAY",
     "WIN_TO_NIL_HOME",
     "WIN_TO_NIL_AWAY",
+    "ASIAN_HANDICAP",
+    "CORNERS_OU",
+    "CORNERS_HOME",
+    "CORNERS_AWAY",
+    "CARDS_OU",
 ]
 
 
