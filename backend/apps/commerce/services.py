@@ -3,7 +3,7 @@ from django.db import transaction
 from django.utils import timezone
 
 from apps.accounts.telegram import notify_user, site_url
-from apps.checks.constants import COMBO_TIERS, PROMO_PACKAGES, product_label
+from apps.checks.constants import ANALYSIS_KEY, COMBO_TIERS, PROMO_PACKAGES, product_label
 from apps.checks.models import DailyCheck
 from apps.checks.services.checks_logic import check_is_ready, get_check_display_text
 from apps.checks.services.time import yerevan_today
@@ -48,9 +48,12 @@ def approve_payment(payment_id: int, reviewer=None) -> Payment:
 
     pkg_key = payment.package_key
     is_combo = pkg_key in COMBO_TIERS
+    is_analysis = pkg_key == ANALYSIS_KEY
     if is_combo and not payment.combo_order_id:
         raise PaymentStateError("Կոնստրուկտորի պատվերը չի գտնվել")
-    if pkg_key != "pkg_vip" and not is_combo:
+    if is_analysis and not payment.analysis_order_id:
+        raise PaymentStateError("Վերլուծության պատվերը չի գտնվել")
+    if pkg_key != "pkg_vip" and not is_combo and not is_analysis:
         check = DailyCheck.objects.filter(package_key=pkg_key).first()
         if not check or not check_is_ready(check):
             raise PaymentStateError("Այս փաթեթի չեկը այսօր պատրաստ չէ")
@@ -79,6 +82,17 @@ def approve_payment(payment_id: int, reviewer=None) -> Payment:
                 f"\n👉 {link}" if link else ""
             )
         notify_user(payment.user, text)
+    elif is_analysis:
+        order = payment.analysis_order
+        order.status = order.STATUS_PAID
+        order.paid_at = timezone.now()
+        order.save(update_fields=["status", "paid_at"])
+        link = site_url(f"/analysis/{order.analysis_id}")
+        notify_user(
+            payment.user,
+            f"✅ Վճարումը հաստատվեց՝ {label}\n⚽ {order.analysis.home} - {order.analysis.away}"
+            + (f"\n👉 {link}" if link else ""),
+        )
     elif pkg_key == "pkg_vip":
         VipMember.objects.get_or_create(user=payment.user)
         link = settings.VIP_CHANNEL_LINK
@@ -100,6 +114,8 @@ def reject_payment(payment_id: int, reviewer=None) -> Payment:
     payment.save(update_fields=["status", "reviewed_at", "reviewed_by"])
     if payment.combo_order_id:
         type(payment.combo_order).objects.filter(pk=payment.combo_order_id).update(status="rejected")
+    if payment.analysis_order_id:
+        type(payment.analysis_order).objects.filter(pk=payment.analysis_order_id).update(status="rejected")
     label = product_label(payment.package_key)
     notify_user(payment.user, f"❌ Ձեր վճարումը ({label}) մերժվեց։ Հարցերի դեպքում գրեք support-ին կայքում։")
     return payment

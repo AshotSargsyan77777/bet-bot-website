@@ -22,6 +22,7 @@ from apps.checks.services.n8n import apply_n8n_packages
 from apps.checks.services.records import record_published_check, results_stats, visible_history
 from apps.checks.services.settlement import settle_pending_records
 from apps.checks.services.time import yerevan_today
+from apps.analysis.store import store_match_analyses
 from apps.combinator.pool import store_combinator_selections
 from apps.commerce.services import get_active_subscriptions
 
@@ -137,6 +138,9 @@ class InternalPackagesWebhook(APIView):
         result = apply_n8n_packages(packages)
         if selections:
             result["combinator_pool"] = store_combinator_selections(selections, result["checks_date"])
+        analyses = request.data.get("match_analyses")
+        if isinstance(analyses, list) and analyses:
+            result["match_analyses"] = store_match_analyses(analyses, result["checks_date"])
         logger.info("n8n packages applied: %s available, date %s", result["available"], result["checks_date"])
         return Response(result)
 

@@ -220,4 +220,21 @@ const combinatorSelections = buildGroups(pools.promo, comboStage)
   }));
 outputItems.push({ json: { combinator_selections: combinatorSelections } });
 
+// ՆՈՐ: խաղի վերլուծություններ (կայքում վաճառվում են առանձին)՝ ամբողջական հաշվետվություն + 5 լավագույն ընտրանք
+const matchAnalyses = [];
+for (const item of $input.all()) {
+  const j = item.json;
+  if (!j.report || !j.fixtureId) continue;
+  const picks = (j.candidates || [])
+    .filter((c) => c.risk !== 'HIGH' && c.probability >= 0.5)
+    .sort((x, y) => candScore(y) - candScore(x))
+    .slice(0, 5)
+    .map((c) => ({ market: c.market, selection: c.selection, odd: c.odd, probability: c.probability }));
+  matchAnalyses.push({
+    fixture_id: j.fixtureId, league_id: j.leagueId, home: j.homeTeamName, away: j.awayTeamName,
+    report: j.report, picks,
+  });
+}
+outputItems.push({ json: { match_analyses: matchAnalyses } });
+
 return outputItems;
