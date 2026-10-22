@@ -113,7 +113,10 @@ const seasonLg = () => ({ form: 'WWDLW', fixtures: { played: { home: 6, away: 6,
   await run('Generate Packages', 'generate_packages.js', outputs['Analyze Matches']);
   for (const p of outputs['Generate Packages']) {
     const j = p.json;
+    if (j.combinator_selections) { console.log(`  combinator: ${j.combinator_selections.length} picks, fixtures=${new Set(j.combinator_selections.map((s) => s.fixture_id)).size}`); continue; }
     console.log(`  ${j.tier}_${j.package}: ${j.available ? `OK ${j.quality} odds=${j.combined_odds} hit=${j.estimated_hit_chance}% legs=${j.selection_count} [${j.selections.map((s) => s.market).join(',')}]` : 'N/A ' + j.reason}`);
   }
-  ;
+  await run('Create Telegram Message', 'create_message.js', outputs['Generate Packages']);
+  const msg = outputs['Create Telegram Message'][0].json;
+  console.log(`  payload: packages=${msg.packages.length} combinator_selections=${msg.combinator_selections.length}`);
 })().catch((e) => { console.error(e); process.exit(1); });

@@ -208,4 +208,16 @@ for (const tier of ['standard', 'champions', 'europa', 'promo']) {
   }
 }
 
+// ՆՈՐ: ընտրանքներ միայն կայքի կոնստրուկտորի համար (չեկերի վրա չեն ազդում, լրացուցիչ API հարցում չկա).
+// Ամեն խաղից լավագույն 3-ը՝ «relaxed» շեմերով և 1.10–3.00 գործակցով։
+const COMBINATOR_PER_FIXTURE = 3;
+const comboStage = { ...STAGES[1], minOdd: 1.10, maxOdd: 3.00 };
+const combinatorSelections = buildGroups(pools.promo, comboStage)
+  .flatMap((g) => g.slice(0, COMBINATOR_PER_FIXTURE))
+  .map((s) => ({
+    fixture: s.fixtureLabel, fixture_id: s.fixtureId, market: s.market, selection: s.selection,
+    odd: s.odd, probability: s.probability, reasons: s.reasons,
+  }));
+outputItems.push({ json: { combinator_selections: combinatorSelections } });
+
 return outputItems;

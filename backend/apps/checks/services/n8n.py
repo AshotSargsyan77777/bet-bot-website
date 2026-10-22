@@ -16,7 +16,15 @@ def apply_n8n_packages(packages: list) -> dict:
     app = AppSettings.get()
     DailyCheck.ensure_defaults()
 
+    # A check already published today stays as is until the day ends (people may have bought it);
+    # later n8n runs only fill the packages that were not ready yet.
+    locked = set()
+    if app.checks_date == today:
+        locked = {k for k in N8N_KEYS if check_is_ready(DailyCheck.objects.get(package_key=k), today)}
+
     for key in N8N_KEYS:
+        if key in locked:
+            continue
         label = PACKAGES[key]["label"]
         dc = DailyCheck.objects.get(package_key=key)
         dc.body_text = f"{label} չեկը {UNAVAILABLE_TEXT}"
@@ -30,7 +38,7 @@ def apply_n8n_packages(packages: list) -> dict:
     available = 0
     for pkg in packages:
         pkg_key = f"{pkg.get('tier')}_{pkg.get('package')}"
-        if pkg_key not in N8N_KEYS:
+        if pkg_key not in N8N_KEYS or pkg_key in locked:
             continue
         if not pkg.get("available"):
             continue
@@ -76,6 +84,7 @@ def apply_n8n_packages(packages: list) -> dict:
         "ok": True,
         "received": len(packages),
         "available": available,
+        "locked": sorted(locked),
         "checks_date": today,
         "ready": ready_list,
         "new_promo_codes": new_codes,

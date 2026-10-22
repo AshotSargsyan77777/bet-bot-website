@@ -96,10 +96,22 @@ class RecordsAndHistoryTests(APITestCase):
         user = User.objects.create_user("buyer", "b@example.com", "x")
         Subscription.objects.create(user=user, package_key="standard_3x", valid_date=yerevan_today(), record=first)
 
+        # a published check is locked for the day: later n8n runs with other picks don't change it
         changed = {**PKG, "selections": [{**PKG["selections"][0], "selection": "Over 1.5"}, PKG["selections"][1]]}
-        self.post([changed])
+        body = DailyCheck.objects.get(package_key="standard_3x").body_text
+        r = self.post([changed])
+        self.assertEqual(r.data["locked"], ["standard_3x"])
+        self.assertEqual(CheckRecord.objects.count(), 1)
+        self.assertEqual(DailyCheck.objects.get(package_key="standard_3x").body_text, body)
+
+        # only after the admin takes it down can n8n publish a new version
+        admin = User.objects.create_user("adm", "adm@example.com", "x", is_staff=True)
         third = {**PKG, "selections": [{**PKG["selections"][0], "selection": "Under 3.5"}, PKG["selections"][1]]}
-        self.post([third])
+        for pkg in (changed, third):
+            self.client.force_authenticate(admin)
+            self.client.patch("/api/admin/checks/", {"package_key": "standard_3x", "body_text": "-", "is_available": False}, format="json")
+            self.client.force_authenticate(None)
+            self.post([pkg])
         self.assertEqual(CheckRecord.objects.count(), 3)
         self.assertEqual(CheckRecord.objects.filter(is_final=True).count(), 1)
 

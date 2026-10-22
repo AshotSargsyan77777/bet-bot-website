@@ -3,6 +3,7 @@ import logging
 from django.conf import settings
 from django.core import signing
 from django.db import transaction
+from django.utils import timezone
 from rest_framework import generics, status
 from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.response import Response
@@ -14,10 +15,13 @@ from apps.checks.constants import COMBO_TIERS, combo_tier_for
 from apps.checks.models import AppSettings, DailyCheck
 from apps.checks.services.checks_logic import check_is_ready
 from apps.checks.services.formatting import format_package
+from apps.checks.services.time import yerevan_today
 from apps.combinator.models import ComboOrder
+from apps.combinator.pool import todays_selections
 from apps.combinator.search import build_candidate_pool, hit_chance, search_combinations
 from apps.combinator.serializers import ComboOrderCreateSerializer, ComboOrderSerializer, ComboSearchSerializer
 from apps.commerce.models import Payment, SelectionCandidate
+from apps.games.models import FixtureCache
 
 logger = logging.getLogger(__name__)
 
@@ -38,19 +42,37 @@ class CombinatorThrottle(SimpleRateThrottle):
 
 
 def current_pool() -> list[dict]:
-    """Today's ready check selections + admin-added active candidates."""
+    """Today's ready check selections + n8n's combinator picks + admin-added active candidates.
+
+    Built only from stored data, so using the combinator never spends API-Football requests.
+    """
     checks_date = AppSettings.get().checks_date
     selections_lists = [
         check.selections_json
         for check in DailyCheck.objects.all()
         if check.selections_json and check_is_ready(check, checks_date)
     ]
+    selections_lists.append(todays_selections(yerevan_today()))
     admin = list(
         SelectionCandidate.objects.filter(active=True).values(
             "fixture_name", "fixture_id", "market", "selection", "odd", "reasons"
         )
     )
-    return build_candidate_pool(selections_lists, admin)
+    return _drop_started(build_candidate_pool(selections_lists, admin))
+
+
+def _drop_started(pool: list[dict]) -> list[dict]:
+    """Removes picks whose match has already kicked off (when the fixture is known locally)."""
+    ids = {int(c["fixture_id"]) for c in pool if str(c.get("fixture_id") or "").isdigit()}
+    if not ids:
+        return pool
+    started = {
+        str(i)
+        for i in FixtureCache.objects.filter(api_fixture_id__in=ids, kickoff__lte=timezone.now()).values_list(
+            "api_fixture_id", flat=True
+        )
+    }
+    return [c for c in pool if str(c.get("fixture_id") or "") not in started]
 
 
 class CombinatorPoolView(APIView):

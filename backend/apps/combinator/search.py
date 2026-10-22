@@ -52,6 +52,7 @@ def build_candidate_pool(daily_selections: list[list], admin_candidates: list[di
                 "probability": _prob(s.get("probability")),
             }
             pool[_dedupe_key(item)] = item
+    admin_pool: dict[tuple, dict] = {}
     for c in admin_candidates:
         odd = float(c.get("odd", 0) or 0)
         if odd <= 1:
@@ -65,8 +66,10 @@ def build_candidate_pool(daily_selections: list[list], admin_candidates: list[di
             "reasons": c.get("reasons") or [],
             "probability": _prob(c.get("probability")),
         }
-        pool[_dedupe_key(item)] = item
-    return list(pool.values())[:MAX_CANDIDATES]
+        admin_pool[_dedupe_key(item)] = item
+    # admin picks are never cut off by the size limit
+    rest = [v for k, v in pool.items() if k not in admin_pool]
+    return (list(admin_pool.values()) + rest)[:MAX_CANDIDATES]
 
 
 def search_combinations(

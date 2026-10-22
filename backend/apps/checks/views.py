@@ -22,6 +22,7 @@ from apps.checks.services.n8n import apply_n8n_packages
 from apps.checks.services.records import record_published_check, results_stats, visible_history
 from apps.checks.services.settlement import settle_pending_records
 from apps.checks.services.time import yerevan_today
+from apps.combinator.pool import store_combinator_selections
 from apps.commerce.services import get_active_subscription
 
 logger = logging.getLogger(__name__)
@@ -111,7 +112,15 @@ class InternalPackagesWebhook(APIView):
                 {"error": "packages must be a list of objects (max 50)", "code": "invalid"},
                 status=status.HTTP_400_BAD_REQUEST,
             )
+        selections = request.data.get("combinator_selections")
+        if selections is not None and not isinstance(selections, list):
+            return Response(
+                {"error": "combinator_selections must be an array", "code": "invalid"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
         result = apply_n8n_packages(packages)
+        if selections:
+            result["combinator_pool"] = store_combinator_selections(selections, result["checks_date"])
         logger.info("n8n packages applied: %s available, date %s", result["available"], result["checks_date"])
         return Response(result)
 

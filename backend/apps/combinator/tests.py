@@ -1,11 +1,13 @@
 import io
 import shutil
 import tempfile
+from datetime import timedelta
 from unittest import mock
 
 from django.contrib.auth import get_user_model
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import SimpleTestCase, override_settings
+from django.utils import timezone
 from PIL import Image
 from rest_framework.test import APITestCase
 
@@ -13,7 +15,9 @@ from apps.checks.models import AppSettings, DailyCheck
 from apps.checks.services.time import yerevan_today
 from apps.combinator.models import ComboOrder
 from apps.combinator.search import build_candidate_pool, search_combinations
+from apps.combinator.views import current_pool
 from apps.commerce.models import Payment, SelectionCandidate, VipMember
+from apps.games.models import FixtureCache
 
 User = get_user_model()
 MEDIA = tempfile.mkdtemp()
@@ -138,3 +142,51 @@ class CombinatorFlowTests(APITestCase):
         self.client.force_authenticate(admin)
         self.client.post("/api/admin/payments/", {"payment_id": pay.id, "action": "reject"}, format="json")
         self.assertEqual(ComboOrder.objects.get().status, "rejected")
+
+
+@override_settings(N8N_INTERNAL_KEY="k", PROMOS_PER_UPDATE=0, TELEGRAM_BOT_TOKEN="")
+class N8nCombinatorPoolTests(APITestCase):
+    def setUp(self):
+        user = User.objects.create_user("v", "v@example.com", "x")
+        VipMember.objects.create(user=user)
+        self.client.force_authenticate(user)
+
+    def post(self, selections):
+        return self.client.post(
+            "/api/internal/packages/",
+            {"packages": [], "combinator_selections": selections},
+            format="json",
+            HTTP_X_INTERNAL_KEY="k",
+        )
+
+    def test_selections_feed_only_the_combinator(self):
+        picks = [
+            {"fixture": "A - B", "fixture_id": 11, "market": "OU", "selection": "Over 1.5", "odd": 1.3, "probability": 0.8},
+            {"fixture": "C - D", "fixture_id": 12, "market": "BTTS", "selection": "Yes", "odd": 1.9, "probability": 0.6},
+            {"fixture": "bad", "market": "OU", "selection": "Over", "odd": "x"},
+        ]
+        r = self.post(picks)
+        self.assertEqual(r.data["combinator_pool"], 2)
+        self.assertEqual(r.data["available"], 0)  # no check was created from them
+        self.assertFalse(DailyCheck.objects.filter(is_available=True).exists())
+        # a later run merges (keeps earlier picks so found offers stay buyable) and refreshes odds
+        self.post([{**picks[1], "odd": 2.0}, {"fixture": "E - F", "fixture_id": 13, "market": "OU", "selection": "Under 3.5", "odd": 1.5}])
+        self.assertEqual(self.client.get("/api/combinator/pool/").data["count"], 3)
+        pool = {c["fixture_id"]: c for c in current_pool()}
+        self.assertEqual(pool["12"]["odd"], 2.0)
+
+        # picks of a match that has already started are not offered
+        FixtureCache.objects.create(
+            api_fixture_id=11, home_team_name="A", away_team_name="B", kickoff=timezone.now() - timedelta(minutes=5)
+        )
+        self.assertEqual(self.client.get("/api/combinator/pool/").data["count"], 2)
+
+        r = self.client.post("/api/combinator/search/", {"target_odds_min": 2.9, "target_odds_max": 3.1, "max_legs": 3}, format="json")
+        self.assertEqual(r.status_code, 200, r.data)
+        self.assertEqual(r.data["results"][0]["combined_odds"], 3.0)
+
+    def test_invalid_payload(self):
+        r = self.client.post(
+            "/api/internal/packages/", {"packages": [], "combinator_selections": "x"}, format="json", HTTP_X_INTERNAL_KEY="k"
+        )
+        self.assertEqual(r.status_code, 400)

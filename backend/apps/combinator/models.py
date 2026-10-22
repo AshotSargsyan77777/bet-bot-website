@@ -29,3 +29,11 @@ class ComboOrder(models.Model):
     @property
     def label(self) -> str:
         return COMBO_TIERS[self.tier]["label"]
+
+
+class CombinatorPool(models.Model):
+    """Analysed picks n8n sends for the combinator only (they never become checks); one row per Yerevan day."""
+
+    date = models.CharField(max_length=10, unique=True)
+    selections = models.JSONField(default=list)
+    updated_at = models.DateTimeField(auto_now=True)
