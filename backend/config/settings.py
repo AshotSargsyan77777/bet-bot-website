@@ -255,7 +255,7 @@ GAMES_LEAGUE_IDS = [int(x) for x in env_list("GAMES_LEAGUE_IDS", "39,140,135,78,
 # How long computed team form (last N matches) is reused before re-fetching from API-Football.
 FORM_STATS_TTL_MINUTES = int(os.environ.get("FORM_STATS_TTL_MINUTES", "360"))
 # How often today's fixtures (live scores, statuses) are re-fetched when someone opens the games page
-FIXTURE_REFRESH_MINUTES = int(os.environ.get("FIXTURE_REFRESH_MINUTES", "10"))
+FIXTURE_REFRESH_MINUTES = int(os.environ.get("FIXTURE_REFRESH_MINUTES", "30"))
 
 CELERY_BEAT_SCHEDULE = {
     "sync-today-fixtures": {
