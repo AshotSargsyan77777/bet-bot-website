@@ -5,10 +5,12 @@ import { PageHeader } from "../components/PageHeader";
 import { ComboResultCard } from "../components/stats/ComboResultCard";
 import type { ComboResult } from "../types/form";
 
+// Ողների քանակը ընտրված է այնպես, որ միջին գործակիցը մնա ~1.3–1.4 (ավելի հավանական ընտրանքներ)
 const PRESETS = [
-  { label: "x9", min: 8.5, max: 9.5, legs: 9 },
-  { label: "x10", min: 9.5, max: 10.5, legs: 10 },
-  { label: "x20", min: 18, max: 22, legs: 12 },
+  { label: "x5", min: 4.8, max: 5.3, legs: 5 },
+  { label: "x10", min: 9.5, max: 10.5, legs: 7 },
+  { label: "x15", min: 14.3, max: 15.8, legs: 8 },
+  { label: "x20", min: 19, max: 21, legs: 9 },
 ];
 
 type SearchParams = { targetMin: string; targetMax: string; legs: string; legMin: string; legMax: string };
@@ -41,9 +43,9 @@ export function Combinator() {
   });
 
   const [form, setForm] = useState<SearchParams>({
-    targetMin: "9",
-    targetMax: "10",
-    legs: "10",
+    targetMin: "9.5",
+    targetMax: "10.5",
+    legs: "7",
     legMin: "1.1",
     legMax: "1.5",
   });
