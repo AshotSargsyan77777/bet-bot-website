@@ -58,7 +58,7 @@ class PublicSummaryView(APIView):
         DailyCheck.ensure_defaults()
         today = yerevan_today()
         ready = [k for k in ready_package_keys() if k in N8N_KEYS]
-        games_today = FixtureCache.objects.filter(kickoff__date=today)
+        games_today = FixtureCache.objects.filter(kickoff__date=today).site_leagues()
         return Response(
             {
                 "today": today,

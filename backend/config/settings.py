@@ -249,6 +249,9 @@ TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "")
 TELEGRAM_BOT_USERNAME = os.environ.get("TELEGRAM_BOT_USERNAME", "").lstrip("@")
 TELEGRAM_ASYNC = env_bool("TELEGRAM_ASYNC", True)
 SITE_URL = os.environ.get("SITE_URL", "") or (f"https://{RAILWAY_PUBLIC_DOMAIN}" if RAILWAY_PUBLIC_DOMAIN else "")
+# Leagues shown on the site (same as the bot / n8n workflow): top 5, UCL, UEL, UECL, World Cup, Euro, Nations League.
+# Order = order in the league filter. Empty = all leagues.
+GAMES_LEAGUE_IDS = [int(x) for x in env_list("GAMES_LEAGUE_IDS", "39,140,135,78,61,2,3,848,1,4,5")]
 # How long computed team form (last N matches) is reused before re-fetching from API-Football.
 FORM_STATS_TTL_MINUTES = int(os.environ.get("FORM_STATS_TTL_MINUTES", "360"))
 

@@ -55,6 +55,7 @@ class GamesWithProviderTests(APITestCase):
         fixtures = [
             api_fixture(1, "Alpha", "Beta", 1, 2),
             api_fixture(2, "Gamma", "Delta", 3, 4, status="1H", league=(140, "La Liga")),
+            api_fixture(3, "Other", "Club", 5, 6, league=(9999, "Random Cup")),  # not a site league
         ]
         p1 = mock.patch("apps.games.tasks.fixtures_by_date", return_value=fixtures)
         p2 = mock.patch("apps.games.form_stats.team_last_fixtures", side_effect=last_matches)
@@ -67,8 +68,11 @@ class GamesWithProviderTests(APITestCase):
         r = self.client.get("/api/games/")
         self.assertEqual(r.status_code, 200, r.data)
         self.assertEqual(r.data["count"], 2)
-        self.assertEqual(FixtureCache.objects.count(), 2)
-        self.assertEqual({lg["name"] for lg in r.data["leagues"]}, {"Premier League", "La Liga"})
+        self.assertEqual(FixtureCache.objects.count(), 3)
+        # only the bot's leagues, in the configured order (Premier League before La Liga)
+        self.assertEqual([lg["name"] for lg in r.data["leagues"]], ["Premier League", "La Liga"])
+        self.assertEqual(self.client.get("/api/games/?q=Other").data["count"], 0)
+        self.assertEqual(self.client.get("/api/summary/").data["games_today"], 2)
         first = r.data["results"][0]
         self.assertEqual(first["home_form"]["win_pct"], 100.0)
         self.assertEqual(first["form_diff"], 100.0)

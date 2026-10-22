@@ -74,6 +74,6 @@ def compute_fixture_form(fixture: FixtureCache) -> bool:
 @shared_task
 def compute_form_for_date(date: str | None = None, limit: int = 200):
     date = date or yerevan_today()
-    pending = FixtureCache.objects.filter(kickoff__date=date, stats_computed_at__isnull=True)[:limit]
+    pending = FixtureCache.objects.filter(kickoff__date=date, stats_computed_at__isnull=True).site_leagues()[:limit]
     done = sum(1 for f in pending if compute_fixture_form(f))
     return {"date": date, "computed": done}
