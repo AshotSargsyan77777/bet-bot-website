@@ -2,6 +2,7 @@ import { Link } from "react-router-dom";
 import { LIVE_STATUSES, type GameRow } from "../types/game";
 import { useT } from "../i18n";
 import { FormBars } from "./FormBars";
+import { TeamLogo } from "./TeamLogo";
 
 function statusClass(status: string) {
   if (LIVE_STATUSES.includes(status)) return "game-card--live";
@@ -22,11 +23,21 @@ export function GameCard({ game, compact }: { game: GameRow; compact?: boolean }
       {LIVE_STATUSES.includes(game.status) && (
         <span className="pill pill--live"><span className="live-dot" /> LIVE</span>
       )}
-      <header className="game-card__league">{game.league}</header>
+      <header className="game-card__league">
+        <TeamLogo src={game.league_logo} size={16} />
+        {game.league}
+        {game.analysis && <span className="chip chip--win game-card__badge">{t("games.badge")}</span>}
+      </header>
       <div className="game-card__teams">
-        <span className="game-card__team">{game.home}</span>
+        <span className="game-card__team">
+          <TeamLogo src={game.home_logo} size={32} />
+          {game.home}
+        </span>
         <span className="game-card__score">{score}</span>
-        <span className="game-card__team game-card__team--away">{game.away}</span>
+        <span className="game-card__team game-card__team--away">
+          <TeamLogo src={game.away_logo} size={32} />
+          {game.away}
+        </span>
       </div>
       <footer className="game-card__meta">
         <span>{time}</span>

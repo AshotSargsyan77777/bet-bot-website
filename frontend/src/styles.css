@@ -552,6 +552,21 @@ label {
   color: var(--text-muted);
   margin-bottom: 0.65rem;
   padding-right: 4rem;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.game-card__badge {
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: 0.7rem;
+}
+
+.team-logo {
+  object-fit: contain;
+  flex-shrink: 0;
 }
 
 .game-card__teams {
@@ -565,10 +580,30 @@ label {
 .game-card__team {
   font-weight: 600;
   font-size: 0.95rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.3rem;
 }
 
 .game-card__team--away {
   text-align: right;
+}
+
+.match-hero__teams {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 1.5rem;
+}
+
+.match-hero__team {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.4rem;
+  font-weight: 700;
+  max-width: 40%;
 }
 
 .game-card__score {

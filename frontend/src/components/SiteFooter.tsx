@@ -12,7 +12,7 @@ export function SiteFooter({ showCombinator = false }: { showCombinator?: boolea
         </div>
         <div className="site-footer__links">
           <Link to="/checks">{t("nav.checks")}</Link>
-          <Link to="/analysis">{t("nav.analysis")}</Link>
+          <Link to="/games?analysis=1">{t("nav.analysis")}</Link>
           <Link to="/results">{t("nav.results")}</Link>
           <Link to="/games">{t("nav.games")}</Link>
           {showCombinator && <Link to="/combinator">{t("nav.combinator")}</Link>}

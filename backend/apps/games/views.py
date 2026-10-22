@@ -7,12 +7,15 @@ from rest_framework import permissions, serializers, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from apps.analysis.models import MatchAnalysis
+from apps.analysis.views import analysis_info
 from apps.checks.services.time import yerevan_today
 from apps.games.football_api import FootballApiError, fixture_by_id, head_to_head, is_configured
 from apps.games.form_stats import aggregate_form
 from apps.games.leagues import site_leagues
 from apps.games.models import FixtureCache
 from apps.games.tasks import compute_fixture_form, needs_sync, sync_fixtures_for_date
+from config.i18n import localize
 from config.pagination import StandardPagination
 
 LIVE_STATUSES = ["1H", "2H", "HT", "ET", "BT", "P", "LIVE", "INT"]
@@ -28,19 +31,33 @@ class GameListQuerySerializer(serializers.Serializer):
     status = serializers.ChoiceField(choices=["", "live", "upcoming", "finished"], required=False)
     min_win_pct = serializers.FloatField(required=False, min_value=0, max_value=100)
     sort = serializers.ChoiceField(choices=["kickoff", "form_diff"], required=False, default="kickoff")
+    analysis = serializers.BooleanField(required=False, default=False)  # only matches with a match analysis
 
 
 class GameDetailQuerySerializer(serializers.Serializer):
     last_n = serializers.IntegerField(required=False, min_value=1, max_value=10, default=5)
 
 
-def serialize_fixture(f: FixtureCache) -> dict:
+def team_logo(team_id) -> str | None:
+    """API-Football's public logo images (served by its CDN, not counted as API requests)."""
+    return f"https://media.api-sports.io/football/teams/{team_id}.png" if team_id else None
+
+
+def league_logo(league_id) -> str | None:
+    return f"https://media.api-sports.io/football/leagues/{league_id}.png" if league_id else None
+
+
+def serialize_fixture(f: FixtureCache, analysis: dict | None = None) -> dict:
     return {
         "id": f.api_fixture_id,
         "league": f.league_name,
         "league_id": f.league_id,
+        "league_logo": league_logo(f.league_id),
         "home": f.home_team_name,
         "away": f.away_team_name,
+        "home_logo": team_logo(f.home_team_id),
+        "away_logo": team_logo(f.away_team_id),
+        "analysis": analysis,
         "kickoff": f.kickoff,
         "status": f.status_short,
         "score": [f.goals_home, f.goals_away],
@@ -74,6 +91,8 @@ class GameListView(APIView):
         }
         if params.get("league"):
             qs = qs.filter(league_id=params["league"])
+        if params["analysis"]:
+            qs = qs.filter(api_fixture_id__in=MatchAnalysis.objects.values("fixture_id"))
         status_f = params.get("status")
         if status_f == "live":
             qs = qs.filter(status_short__in=LIVE_STATUSES)
@@ -105,7 +124,10 @@ class GameListView(APIView):
                 if f.stats_computed_at is None:
                     compute_fixture_form(f)
 
-        response = paginator.get_paginated_response([serialize_fixture(f) for f in page])
+        analyses = analysis_info(request.user, [f.api_fixture_id for f in page])
+        response = paginator.get_paginated_response(
+            [serialize_fixture(f, analyses.get(f.api_fixture_id)) for f in page]
+        )
         response.data.update(
             {
                 "date": day,
@@ -151,6 +173,7 @@ class GameDetailView(APIView):
         home_name = cached.home_team_name if cached else (live_teams.get("home") or {}).get("name")
         away_name = cached.away_team_name if cached else (live_teams.get("away") or {}).get("name")
         league = cached.league_name if cached else ((live or {}).get("league") or {}).get("name")
+        league_id = cached.league_id if cached else ((live or {}).get("league") or {}).get("id")
 
         home_form = away_form = h2h = None
         stats_error = None
@@ -171,12 +194,16 @@ class GameDetailView(APIView):
                     for m in h2h_raw
                 ]
         except FootballApiError as e:
-            stats_error = str(e) if settings.DEBUG else "Վիճակագրությունը ժամանակավորապես անհասանելի է"
+            stats_error = str(e) if settings.DEBUG else localize("Վիճակագրությունը ժամանակավորապես անհասանելի է")
 
         return Response(
             {
                 "fixture_id": fixture_id,
                 "league": league or "",
+                "league_logo": league_logo(league_id),
+                "home_logo": team_logo(home_id),
+                "away_logo": team_logo(away_id),
+                "analysis": analysis_info(request.user, [fixture_id]).get(fixture_id),
                 "home": home_name or "",
                 "away": away_name or "",
                 "cached": {

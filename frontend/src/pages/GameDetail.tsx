@@ -6,7 +6,9 @@ import { PageHeader } from "../components/PageHeader";
 import { H2HList } from "../components/stats/H2HList";
 import { TeamFormPanel } from "../components/stats/TeamFormPanel";
 import type { H2HMatch, TeamForm } from "../types/form";
-import { LIVE_STATUSES } from "../types/game";
+import { LIVE_STATUSES, type AnalysisInfo } from "../types/game";
+import { MatchAnalysisSection } from "../components/analysis/MatchAnalysisSection";
+import { TeamLogo } from "../components/TeamLogo";
 import { useT } from "../i18n";
 
 type DetailPayload = {
@@ -14,6 +16,10 @@ type DetailPayload = {
   league: string;
   home: string;
   away: string;
+  home_logo?: string | null;
+  away_logo?: string | null;
+  league_logo?: string | null;
+  analysis?: AnalysisInfo | null;
   cached: { kickoff: string | null; status: string | null; score: [number | null, number | null] | null };
   home_form?: TeamForm | null;
   away_form?: TeamForm | null;
@@ -67,14 +73,26 @@ export function GameDetail() {
           <p className="match-hero__live"><span className="live-dot" /> LIVE {elapsed != null ? `${elapsed}'` : ""}</p>
         )}
         <p className="muted">{statusShort}</p>
-        <div className="match-hero__score">
-          {scoreHome ?? "—"} : {scoreAway ?? "—"}
+        <div className="match-hero__teams">
+          <span className="match-hero__team">
+            <TeamLogo src={data.home_logo} size={56} alt={data.home} />
+            {data.home}
+          </span>
+          <div className="match-hero__score">
+            {scoreHome ?? "—"} : {scoreAway ?? "—"}
+          </div>
+          <span className="match-hero__team">
+            <TeamLogo src={data.away_logo} size={56} alt={data.away} />
+            {data.away}
+          </span>
         </div>
-        <p className="muted">
+        <p className="muted" style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: "0.35rem" }}>
+          <TeamLogo src={data.league_logo} size={18} />
           {data.league}
           {kickoff ? ` · ${new Date(kickoff).toLocaleString([], { dateStyle: "medium", timeStyle: "short" })}` : ""}
         </p>
       </div>
+      {data.analysis && <MatchAnalysisSection info={data.analysis} />}
       <div className="card card--glass">
         <div className="filters">
           <div className="field">
