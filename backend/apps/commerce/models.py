@@ -1,7 +1,7 @@
 from django.conf import settings
 from django.db import models
 
-from apps.checks.constants import PACKAGES
+from apps.checks.constants import ALL_PRODUCTS, PACKAGES
 
 
 class Subscription(models.Model):
@@ -49,7 +49,10 @@ class Payment(models.Model):
     ]
 
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="payments")
-    package_key = models.CharField(max_length=32, choices=[(k, k) for k in PACKAGES])
+    package_key = models.CharField(max_length=32, choices=[(k, k) for k in ALL_PRODUCTS])
+    combo_order = models.OneToOneField(
+        "combinator.ComboOrder", on_delete=models.SET_NULL, null=True, blank=True, related_name="payment"
+    )
     status = models.CharField(max_length=16, choices=STATUS_CHOICES, default=STATUS_PENDING)
     amount = models.PositiveIntegerField(default=0)  # AMD, package price at the time of payment
     receipt = models.ImageField(upload_to="receipts/%Y/%m/")
@@ -63,8 +66,11 @@ class Payment(models.Model):
         ordering = ["-created_at"]
         indexes = [models.Index(fields=["status", "-created_at"], name="payment_status_created_idx")]
         constraints = [
+            # one pending package/VIP payment per user; combinator checks are separate orders
             models.UniqueConstraint(
-                fields=["user"], condition=models.Q(status="pending"), name="one_pending_payment_per_user"
+                fields=["user"],
+                condition=models.Q(status="pending") & ~models.Q(package_key__startswith="combo_"),
+                name="one_pending_payment_per_user",
             )
         ]
 

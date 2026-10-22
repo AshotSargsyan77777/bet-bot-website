@@ -13,6 +13,28 @@ def _dedupe_key(c: dict) -> tuple:
     return (str(fid), c.get("market", ""), c.get("selection", ""))
 
 
+def _fixture_key(c: dict) -> str:
+    return str(c.get("fixture_id") or c.get("fixture_name") or "")
+
+
+def _prob(value) -> float | None:
+    try:
+        p = float(value)
+    except (TypeError, ValueError):
+        return None
+    return p if 0 < p <= 1 else None
+
+
+def hit_chance(legs: list[dict]) -> float | None:
+    probs = [leg.get("probability") for leg in legs]
+    if not probs or any(p is None for p in probs):
+        return None
+    out = 1.0
+    for p in probs:
+        out *= p
+    return out
+
+
 def build_candidate_pool(daily_selections: list[list], admin_candidates: list[dict]) -> list[dict]:
     pool: dict[tuple, dict] = {}
     for selections in daily_selections:
@@ -27,6 +49,7 @@ def build_candidate_pool(daily_selections: list[list], admin_candidates: list[di
                 "selection": s.get("selection", ""),
                 "odd": odd,
                 "reasons": s.get("reasons") or [],
+                "probability": _prob(s.get("probability")),
             }
             pool[_dedupe_key(item)] = item
     for c in admin_candidates:
@@ -40,6 +63,7 @@ def build_candidate_pool(daily_selections: list[list], admin_candidates: list[di
             "selection": c.get("selection", ""),
             "odd": odd,
             "reasons": c.get("reasons") or [],
+            "probability": _prob(c.get("probability")),
         }
         pool[_dedupe_key(item)] = item
     return list(pool.values())[:MAX_CANDIDATES]
@@ -101,23 +125,33 @@ def search_combinations(
                             ),
                         }
                     )
-                results.append({"combined_odds": round(product, 3), "legs": legs, "legs_count": n})
+                chance = hit_chance(chosen)
+                results.append({
+                    "combined_odds": round(product, 3), "legs": legs, "legs_count": n,
+                    "hit_chance": round(chance, 4) if chance is not None else None,
+                })
         if n >= k_max:
             return
+        used_fixtures = {_fixture_key(c) for c in chosen}
         for i in range(start_idx, len(filtered)):
             if len(results) >= max_results:
                 break
             leg = filtered[i]
+            if _fixture_key(leg) in used_fixtures:  # one pick per match (correlated picks are not allowed)
+                continue
             new_prod = product * leg["odd"]
             if new_prod > target_max * 1.5:
                 continue
             backtrack(i + 1, chosen + [leg], new_prod)
 
+    wanted = max_results
+    max_results = min(wanted * 5, 100)  # collect more, then keep the most likely ones
     backtrack(0, [], 1.0)
 
     timed_out = time.monotonic() - start > TIMEOUT_SEC
+    results.sort(key=lambda r: (-(r["hit_chance"] or 0), r["legs_count"]))
     return {
-        "results": results[:max_results],
+        "results": results[:wanted],
         "candidates_used": len(filtered),
         "timed_out": timed_out,
     }

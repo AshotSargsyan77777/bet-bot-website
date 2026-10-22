@@ -16,7 +16,7 @@ from rest_framework.throttling import ScopedRateThrottle
 from rest_framework.views import APIView
 
 from apps.accounts.permissions import IsAdminUser
-from apps.checks.constants import PACKAGES
+from apps.checks.constants import PACKAGES, product_label
 from apps.checks.models import AppSettings
 from apps.checks.services.checks_logic import ready_package_keys
 from apps.checks.services.time import yerevan_today
@@ -57,9 +57,9 @@ class PaymentListCreateView(generics.ListCreateAPIView):
     @transaction.atomic
     def perform_create(self, serializer):
         # A new receipt replaces the user's previous pending one (same as the Telegram bot).
-        Payment.objects.filter(user=self.request.user, status=Payment.STATUS_PENDING).update(
-            status=Payment.STATUS_REJECTED
-        )
+        Payment.objects.filter(user=self.request.user, status=Payment.STATUS_PENDING).exclude(
+            package_key__startswith="combo_"
+        ).update(status=Payment.STATUS_REJECTED)
         pkg = serializer.validated_data["package_key"]
         payment = serializer.save(
             user=self.request.user, status=Payment.STATUS_PENDING, amount=PACKAGES[pkg]["price"]
@@ -256,7 +256,7 @@ class AdminRevenueView(APIView):
         today_start = datetime.combine(today, time.min, tzinfo=tz)
         today_totals = approved.filter(reviewed_at__gte=today_start).aggregate(amount=Sum("amount"), count=Count("id"))
         by_package = [
-            {"key": r["package_key"], "label": PACKAGES.get(r["package_key"], {}).get("label", r["package_key"]),
+            {"key": r["package_key"], "label": product_label(r["package_key"]),
              "count": r["count"], "amount": r["amount"] or 0}
             for r in approved.values("package_key").annotate(count=Count("id"), amount=Sum("amount")).order_by("-amount")
         ]

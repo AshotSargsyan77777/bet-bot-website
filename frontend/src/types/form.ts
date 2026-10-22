@@ -29,18 +29,3 @@ export type H2HMatch = {
   away?: string;
   goals?: { home: number | null; away: number | null } | null;
 };
-
-export type ComboLeg = {
-  fixture_name?: string;
-  market?: string;
-  selection?: string;
-  odd?: number;
-  why?: string;
-  reasons?: string[];
-};
-
-export type ComboResult = {
-  combined_odds: number;
-  legs: ComboLeg[];
-  legs_count?: number;
-};
