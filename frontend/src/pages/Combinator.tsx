@@ -5,7 +5,7 @@ import { PageHeader } from "../components/PageHeader";
 import { ComboResultCard } from "../components/stats/ComboResultCard";
 import type { ComboResult } from "../types/form";
 
-// Ողների քանակը ընտրված է այնպես, որ միջին գործակիցը մնա ~1.3–1.4 (ավելի հավանական ընտրանքներ)
+// Խաղերի քանակը ընտրված է այնպես, որ միջին գործակիցը մնա ~1.3–1.4 (ավելի հավանական ընտրանքներ)
 const PRESETS = [
   { label: "x5", min: 4.8, max: 5.3, legs: 5 },
   { label: "x10", min: 9.5, max: 10.5, legs: 7 },
@@ -30,9 +30,9 @@ function validate(p: SearchParams): string | null {
   if (tMin == null || tMax == null || lMin == null || lMax == null || !Number.isFinite(legs)) {
     return "Լրացրեք բոլոր դաշտերը թվերով";
   }
-  if (tMin < 1.01 || tMin > tMax) return "Ընդհանուր գործակցի min-ը պետք է լինի ≥ 1.01 և ≤ max";
-  if (lMin < 1 || lMin > lMax) return "Ողի min գործակիցը պետք է լինի ≥ 1 և ≤ max";
-  if (legs < 1 || legs > 20) return "Ողների քանակը՝ 1-ից 20";
+  if (tMin < 1.01 || tMin > tMax) return "Ընդհանուր գործակցի «սկսած»-ը պետք է լինի ≥ 1.01 և ≤ «մինչև»-ից";
+  if (lMin < 1 || lMin > lMax) return "Մեկ խաղի գործակցի «սկսած»-ը պետք է լինի ≥ 1 և ≤ «մինչև»-ից";
+  if (legs < 1 || legs > 20) return "Խաղերի քանակը՝ 1-ից 20";
   return null;
 }
 
@@ -83,7 +83,7 @@ export function Combinator() {
       <PageHeader
         eyebrow="Հավելվածներ"
         title="🎯 Կոնստրուկտոր չեկի"
-        subtitle="Ընտրեք պրեսետ կամ նշեք ցանկալի ընդհանուր գործակիցը և ողների քանակը։"
+        subtitle="Ընտրեք պատրաստի տարբերակ կամ նշեք ցանկալի ընդհանուր գործակիցը և չեկում խաղերի քանակը։"
       />
       <div className="card card--glass">
         <p>
@@ -118,23 +118,23 @@ export function Combinator() {
         >
           <div className="filters">
             <div className="field">
-              <span className="field__label">Min ընդհանուր кф</span>
+              <span className="field__label">Ընդհանուր գործակից՝ սկսած</span>
               <input type="text" inputMode="decimal" value={form.targetMin} onChange={set("targetMin")} />
             </div>
             <div className="field">
-              <span className="field__label">Max ընդհանուր кф</span>
+              <span className="field__label">Ընդհանուր գործակից՝ մինչև</span>
               <input type="text" inputMode="decimal" value={form.targetMax} onChange={set("targetMax")} />
             </div>
             <div className="field">
-              <span className="field__label">Ողներ</span>
+              <span className="field__label">Խաղերի քանակ չեկում</span>
               <input type="text" inputMode="numeric" value={form.legs} onChange={set("legs")} />
             </div>
             <div className="field">
-              <span className="field__label">Min кф (ոգ)</span>
+              <span className="field__label">Մեկ խաղի գործակից՝ սկսած</span>
               <input type="text" inputMode="decimal" value={form.legMin} onChange={set("legMin")} />
             </div>
             <div className="field">
-              <span className="field__label">Max кф (ոգ)</span>
+              <span className="field__label">Մեկ խաղի գործակից՝ մինչև</span>
               <input type="text" inputMode="decimal" value={form.legMax} onChange={set("legMax")} />
             </div>
           </div>
@@ -149,7 +149,7 @@ export function Combinator() {
         {search.data && results.length === 0 && (
           <p className="field__hint">
             Կոմբինացիաներ չգտնվեցին ({search.data.candidates_used} ընտրանքից)։ Փորձեք լայնացնել գործակիցների միջակայքը կամ
-            փոքրացնել ողների քանակը։
+            փոքրացնել խաղերի քանակը։
           </p>
         )}
         {search.data?.timed_out && <p className="field__hint">Որոնումը կանգնեցվեց ժամանակի սահմանափակման պատճառով — ցուցադրվում են գտնվածները։</p>}

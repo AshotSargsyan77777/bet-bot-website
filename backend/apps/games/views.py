@@ -8,7 +8,7 @@ from rest_framework.views import APIView
 
 from apps.checks.services.time import yerevan_today
 from apps.games.football_api import FootballApiError, fixture_by_id, head_to_head, is_configured
-from apps.games.form_stats import VENUES, aggregate_form
+from apps.games.form_stats import aggregate_form
 from apps.games.leagues import site_leagues
 from apps.games.models import FixtureCache
 from apps.games.tasks import compute_fixture_form, sync_fixtures_for_date
@@ -31,8 +31,6 @@ class GameListQuerySerializer(serializers.Serializer):
 
 class GameDetailQuerySerializer(serializers.Serializer):
     last_n = serializers.IntegerField(required=False, min_value=1, max_value=10, default=5)
-    home_venue = serializers.ChoiceField(choices=VENUES, required=False, default="all")
-    away_venue = serializers.ChoiceField(choices=VENUES, required=False, default="all")
 
 
 def serialize_fixture(f: FixtureCache) -> dict:
@@ -156,9 +154,9 @@ class GameDetailView(APIView):
         stats_error = None
         try:
             if home_id:
-                home_form = aggregate_form(home_id, home_name or "", last_n, params["home_venue"])
+                home_form = aggregate_form(home_id, home_name or "", last_n, "all")
             if away_id:
-                away_form = aggregate_form(away_id, away_name or "", last_n, params["away_venue"])
+                away_form = aggregate_form(away_id, away_name or "", last_n, "all")
             if home_id and away_id:
                 h2h_raw = head_to_head(home_id, away_id, last_n)
                 h2h = [

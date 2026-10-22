@@ -24,19 +24,15 @@ type DetailPayload = {
   } | null;
 };
 
-type Venue = "all" | "home" | "away";
-
 export function GameDetail() {
   const { id } = useParams<{ id: string }>();
   const [lastN, setLastN] = useState(5);
-  const [homeVenue, setHomeVenue] = useState<Venue>("all");
-  const [awayVenue, setAwayVenue] = useState<Venue>("all");
   const valid = !!id && /^\d+$/.test(id);
 
   const { data, isFetching, isLoading, isError, error } = useQuery({
-    queryKey: ["game", id, lastN, homeVenue, awayVenue],
+    queryKey: ["game", id, lastN],
     queryFn: () =>
-      api<DetailPayload>(`/api/games/${id}/?last_n=${lastN}&home_venue=${homeVenue}&away_venue=${awayVenue}`),
+      api<DetailPayload>(`/api/games/${id}/?last_n=${lastN}`),
     enabled: valid,
     retry: false,
     refetchInterval: (q) => (LIVE_STATUSES.includes(q.state.data?.live?.fixture?.status?.short ?? "") ? 60000 : false),
@@ -83,22 +79,6 @@ export function GameDetail() {
             <span className="field__label">Վերջին խաղեր</span>
             <select value={lastN} onChange={(e) => setLastN(Number(e.target.value))}>
               {[3, 5, 10].map((n) => <option key={n} value={n}>{n}</option>)}
-            </select>
-          </div>
-          <div className="field">
-            <span className="field__label">Տան թիմ</span>
-            <select value={homeVenue} onChange={(e) => setHomeVenue(e.target.value as Venue)}>
-              <option value="all">Բոլոր խաղերը</option>
-              <option value="home">Միայն տանը</option>
-              <option value="away">Միայն արտագնա</option>
-            </select>
-          </div>
-          <div className="field">
-            <span className="field__label">Հյուր թիմ</span>
-            <select value={awayVenue} onChange={(e) => setAwayVenue(e.target.value as Venue)}>
-              <option value="all">Բոլոր խաղերը</option>
-              <option value="home">Միայն տանը</option>
-              <option value="away">Միայն արտագնա</option>
             </select>
           </div>
         </div>

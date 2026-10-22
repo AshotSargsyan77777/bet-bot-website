@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
+import { useEffect, useRef } from "react";
 import { Link, NavLink, Outlet, useLocation } from "react-router-dom";
 import { api } from "../api/client";
 import { useAuth } from "../context/AuthContext";
@@ -23,6 +24,12 @@ const loggedInLinks: NavItem[] = [
 export function Layout() {
   const { user, logout } = useAuth();
   const location = useLocation();
+  const menuRef = useRef<HTMLDetailsElement>(null);
+
+  // On phones the drawer would otherwise stay open over the new page after tapping a link.
+  useEffect(() => {
+    if (menuRef.current) menuRef.current.open = false;
+  }, [location.pathname]);
   const isHome = location.pathname === "/";
 
   const vip = useQuery({
@@ -51,7 +58,7 @@ export function Layout() {
             ))}
           </div>
 
-          <details className="site-nav__menu">
+          <details className="site-nav__menu" ref={menuRef}>
             <summary className="site-nav__burger" aria-label="Մենյու">☰</summary>
             <div className="site-nav__drawer">
               {links.map((l) => (
