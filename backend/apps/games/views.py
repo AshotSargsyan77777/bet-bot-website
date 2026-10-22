@@ -65,12 +65,11 @@ class GameListView(APIView):
             result = sync_fixtures_for_date(day)
             provider_error = result.get("error")
 
-        qs = day_qs
-        leagues = list(
-            day_qs.exclude(league_id__isnull=True)
-            .values("league_id", "league_name")
-            .distinct()
-            .order_by("league_name")
+        qs = day_qs.site_leagues()
+        order = {lid: i for i, lid in enumerate(settings.GAMES_LEAGUE_IDS)}
+        leagues = sorted(
+            qs.exclude(league_id__isnull=True).values("league_id", "league_name").distinct(),
+            key=lambda lg: (order.get(lg["league_id"], len(order)), lg["league_name"]),
         )
         if params.get("league"):
             qs = qs.filter(league_id=params["league"])

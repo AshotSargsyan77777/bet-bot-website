@@ -1,4 +1,4 @@
-from datetime import timedelta
+from datetime import date, timedelta
 from unittest import mock
 
 from django.contrib.auth import get_user_model
@@ -105,7 +105,7 @@ class RecordsAndHistoryTests(APITestCase):
 
         # today's checks are not public
         self.assertEqual(self.client.get("/api/checks/history/").data["count"], 0)
-        yesterday = (timezone.localdate() - timedelta(days=1)).isoformat()
+        yesterday = (date.fromisoformat(yerevan_today()) - timedelta(days=1)).isoformat()
         CheckRecord.objects.update(date=yesterday)
         hist = self.client.get("/api/checks/history/").data
         # final version + the version someone bought; the unsold intermediate one is hidden
@@ -115,7 +115,7 @@ class RecordsAndHistoryTests(APITestCase):
     def test_settlement_and_stats(self):
         self.post([PKG])
         record = CheckRecord.objects.get()
-        yesterday = (timezone.localdate() - timedelta(days=1)).isoformat()
+        yesterday = (date.fromisoformat(yerevan_today()) - timedelta(days=1)).isoformat()
         CheckRecord.objects.update(date=yesterday)
         fixtures = [fx(2, 1, fid=1), {**fx(1, 0, fid=2)}]
         with mock.patch("apps.checks.services.settlement.fixtures_by_ids", return_value=fixtures) as m:

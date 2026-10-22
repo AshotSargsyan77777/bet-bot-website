@@ -1,7 +1,18 @@
 from django.db import models
 
 
+class FixtureQuerySet(models.QuerySet):
+    def site_leagues(self):
+        """Only the leagues the site and the bot work with (settings.GAMES_LEAGUE_IDS)."""
+        from django.conf import settings
+
+        ids = settings.GAMES_LEAGUE_IDS
+        return self.filter(league_id__in=ids) if ids else self
+
+
 class FixtureCache(models.Model):
+    objects = FixtureQuerySet.as_manager()
+
     api_fixture_id = models.IntegerField(unique=True, db_index=True)
     league_id = models.IntegerField(null=True, blank=True)
     league_name = models.CharField(max_length=255, blank=True, default="")
