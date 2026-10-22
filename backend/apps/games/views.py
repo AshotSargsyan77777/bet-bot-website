@@ -1,7 +1,7 @@
 from datetime import date as date_cls
 
 from django.conf import settings
-from django.db.models import F, Q
+from django.db.models import Count, F, Q
 from rest_framework import permissions, serializers, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -9,6 +9,7 @@ from rest_framework.views import APIView
 from apps.checks.services.time import yerevan_today
 from apps.games.football_api import FootballApiError, fixture_by_id, head_to_head, is_configured
 from apps.games.form_stats import VENUES, aggregate_form
+from apps.games.leagues import site_leagues
 from apps.games.models import FixtureCache
 from apps.games.tasks import compute_fixture_form, sync_fixtures_for_date
 from config.pagination import StandardPagination
@@ -66,11 +67,11 @@ class GameListView(APIView):
             provider_error = result.get("error")
 
         qs = day_qs.site_leagues()
-        order = {lid: i for i, lid in enumerate(settings.GAMES_LEAGUE_IDS)}
-        leagues = sorted(
-            qs.exclude(league_id__isnull=True).values("league_id", "league_name").distinct(),
-            key=lambda lg: (order.get(lg["league_id"], len(order)), lg["league_name"]),
-        )
+        # .order_by() drops the model's default ordering, otherwise GROUP BY also groups by kickoff
+        counts = {
+            row["league_id"]: row["n"]
+            for row in qs.order_by().values("league_id").annotate(n=Count("id"))
+        }
         if params.get("league"):
             qs = qs.filter(league_id=params["league"])
         status_f = params.get("status")
@@ -108,7 +109,7 @@ class GameListView(APIView):
         response.data.update(
             {
                 "date": day,
-                "leagues": [{"id": lg["league_id"], "name": lg["league_name"]} for lg in leagues],
+                "leagues": site_leagues(counts),
                 "provider_configured": is_configured(),
                 "provider_error": provider_error,
                 "form_pending": qs.filter(stats_computed_at__isnull=True).count() if is_configured() else 0,
