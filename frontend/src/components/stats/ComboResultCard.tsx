@@ -21,7 +21,7 @@ export function ComboResultCard({ result, index }: { result: ComboResult; index?
       <header className="combo-card__head">
         {index != null && <span className="muted">#{index + 1}</span>}
         <span className="combo-result__odds">{result.combined_odds}x</span>
-        <span className="muted">{result.legs?.length ?? 0} ող</span>
+        <span className="muted">{result.legs?.length ?? 0} խաղ</span>
       </header>
       <ol className="combo-card__legs">
         {(result.legs || []).map((leg, i) => (

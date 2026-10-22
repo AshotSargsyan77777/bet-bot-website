@@ -140,7 +140,7 @@ export function Home() {
           <article className="feature-card">
             <div className="feature-card__icon">🎯</div>
             <h3>Կոնստրուկտոր</h3>
-            <p>Ընդհանուր кф 5–20, min/max յուրաքանչյուր ողի — ավտոմատ կոմբինացիաներ։</p>
+            <p>Ընդհանուր գործակից x5–x20, խաղերի քանակը՝ ըստ ցանկության — ավտոմատ կոմբինացիաներ։</p>
           </article>
           <article className="feature-card">
             <div className="feature-card__icon">👑</div>
@@ -185,7 +185,7 @@ export function Home() {
         <h2 className="section__title">Կոնստրուկտոր</h2>
         <p className="section__desc">
           VIP անդամները կարող են կառուցել սեփական կոմբինացիաները օրվա ընտրանքներից՝ ըստ ցանկալի ընդհանուր
-          գործակցի և ողների քանակի։
+          գործակցի և խաղերի քանակի։
         </p>
         <Link to="/combinator" className="btn" style={{ marginTop: "1rem" }}>Բացել կոնստրուկտորը</Link>
       </section>
