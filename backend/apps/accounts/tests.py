@@ -1,6 +1,7 @@
 from io import StringIO
 
 from django.contrib.auth import get_user_model
+from django.core.cache import cache
 from django.core.management import call_command
 from rest_framework.test import APITestCase
 
@@ -101,3 +102,25 @@ class AuthFlowTests(APITestCase):
         self.assertEqual(r.status_code, 200)
         self.assertEqual(r.data["email"], "new@example.com")
         self.assertEqual(r.data["username"], "alice")
+
+
+class ApiLanguageTests(APITestCase):
+    """Errors follow the Accept-Language header (hy default, en, ru)."""
+
+    def tearDown(self):
+        cache.clear()  # the auth throttle counter would leak into other tests
+
+    def register(self, lang=None, **data):
+        body = {"username": "lang1", "email": "l@example.com", "password": "12345678", **data}
+        extra = {"HTTP_ACCEPT_LANGUAGE": lang} if lang else {}
+        return self.client.post("/api/auth/register/", body, format="json", **extra).json()  # rendered body
+
+    def test_framework_and_own_messages_are_translated(self):
+        self.assertIn("Գաղտնաբառը", self.register()["error"])
+        self.assertIn("common", self.register("en")["error"])
+        self.assertIn("распространён", self.register("ru")["error"])
+        User.objects.create_user("taken", "t@example.com", "x")
+        own = {"username": "taken", "password": "Str0ng!Passw0rd"}
+        self.assertIn("username-ը արդեն", self.register(**own)["error"])
+        self.assertIn("already exists", self.register("en", **own)["error"])
+        self.assertIn("уже существует", self.register("ru-RU,ru;q=0.9", **own)["fields"]["username"][0])

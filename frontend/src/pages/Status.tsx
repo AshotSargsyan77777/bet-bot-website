@@ -7,7 +7,8 @@ import { TelegramLoginButton, type TelegramUser } from "../components/TelegramLo
 import { CheckPreview } from "../components/stats/CheckPreview";
 import { useAuth } from "../context/AuthContext";
 import type { MyCheck } from "../types/catalog";
-import { paymentStatusLabel } from "../utils/packageMeta";
+import { isPaymentStatus, paymentStatusKey } from "../utils/packageMeta";
+import { useT, usePkgLabel } from "../i18n";
 
 type PaymentRow = { id: number; status: string; package_key: string; package_label: string; created_at: string };
 type StatusPayload = {
@@ -20,6 +21,7 @@ type StatusPayload = {
 
 function ProfileCard() {
   const { user, refreshMe } = useAuth();
+  const { t } = useT();
   const [email, setEmail] = useState(user?.email ?? "");
   const [current, setCurrent] = useState("");
   const [next, setNext] = useState("");
@@ -28,7 +30,7 @@ function ProfileCard() {
   const saveEmail = useMutation({
     mutationFn: () => api("/api/me/", { method: "PATCH", json: { email } }),
     onSuccess: async () => {
-      setMsg("✅ Email-ը թարմացվեց");
+      setMsg(t("status.emailSaved"));
       await refreshMe();
     },
   });
@@ -38,14 +40,14 @@ function ProfileCard() {
     onSuccess: async () => {
       setCurrent("");
       setNext("");
-      setMsg("✅ Գաղտնաբառը պահպանվեց");
+      setMsg(t("status.passwordSaved"));
       await refreshMe();
     },
   });
 
   return (
     <div className="card card--interactive">
-      <h3>Պրոֆիլ</h3>
+      <h3>{t("status.profile")}</h3>
       <p className="muted">{user?.username}</p>
       <form
         onSubmit={(e) => {
@@ -60,7 +62,7 @@ function ProfileCard() {
         </div>
         {saveEmail.isError && <p className="field__error">{saveEmail.error.message}</p>}
         <button type="submit" className="secondary" disabled={saveEmail.isPending || email === user?.email}>
-          Պահպանել email-ը
+          {t("status.saveEmail")}
         </button>
       </form>
       <form
@@ -73,19 +75,19 @@ function ProfileCard() {
       >
         {user?.has_password ? (
           <div className="field">
-            <span className="field__label">Ընթացիկ գաղտնաբառ</span>
+            <span className="field__label">{t("status.currentPassword")}</span>
             <input type="password" value={current} onChange={(e) => setCurrent(e.target.value)} required autoComplete="current-password" />
           </div>
         ) : (
-          <p className="field__hint">Դուք մուտք եք գործել Telegram-ով. սահմանեք գաղտնաբառ՝ օգտանունով մուտքի համար։</p>
+          <p className="field__hint">{t("status.telegramNoPassword")}</p>
         )}
         <div className="field">
-          <span className="field__label">Նոր գաղտնաբառ (min 8)</span>
+          <span className="field__label">{t("status.newPassword")}</span>
           <input type="password" value={next} onChange={(e) => setNext(e.target.value)} required minLength={8} autoComplete="new-password" />
         </div>
         {changePassword.isError && <p className="field__error">{changePassword.error.message}</p>}
         <button type="submit" className="secondary" disabled={changePassword.isPending}>
-          {user?.has_password ? "Փոխել գաղտնաբառը" : "Սահմանել գաղտնաբառ"}
+          {user?.has_password ? t("status.changePassword") : t("status.setPassword")}
         </button>
       </form>
       {msg && <p style={{ marginTop: "0.75rem" }}>{msg}</p>}
@@ -95,6 +97,7 @@ function ProfileCard() {
 
 function TelegramCard() {
   const { user, refreshMe } = useAuth();
+  const { t } = useT();
   const tg = user?.telegram;
   const link = useMutation({
     mutationFn: (data: TelegramUser) => api("/api/me/telegram/", { method: "POST", json: data }),
@@ -116,7 +119,7 @@ function TelegramCard() {
       <h3>✈️ Telegram</h3>
       {tg ? (
         <>
-          <p>Կապված է՝ <strong>{tg.username ? `@${tg.username}` : tg.first_name}</strong></p>
+          <p>{t("status.tgLinked")} <strong>{tg.username ? `@${tg.username}` : tg.first_name}</strong></p>
           <label style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
             <input
               type="checkbox"
@@ -125,15 +128,15 @@ function TelegramCard() {
               onChange={(e) => toggle.mutate(e.target.checked)}
               style={{ width: "auto" }}
             />
-            Ծանուցումներ Telegram-ով (վճարում, պատասխաններ, օրվա չեկեր)
+            {t("status.tgNotify")}
           </label>
           <button type="button" className="secondary" style={{ marginTop: "0.75rem" }} disabled={unlink.isPending} onClick={() => unlink.mutate()}>
-            Անջատել Telegram-ը
+            {t("status.tgUnlink")}
           </button>
         </>
       ) : (
         <>
-          <p className="muted">Կապեք Telegram-ը՝ վճարման հաստատման, support-ի պատասխանների և օրվա չեկերի մասին ծանուցումներ ստանալու համար։</p>
+          <p className="muted">{t("status.tgLinkHint")}</p>
           <TelegramLoginButton onAuth={onAuth} />
         </>
       )}
@@ -144,6 +147,8 @@ function TelegramCard() {
 
 export function Status() {
   const { user } = useAuth();
+  const { t } = useT();
+  const pkgLabel = usePkgLabel();
   const [page, setPage] = useState(1);
   const status = useQuery({
     queryKey: ["status"],
@@ -164,41 +169,41 @@ export function Status() {
   if (!user) {
     return (
       <div className="card">
-        <PageHeader title="👤 Կարգավիճակ" subtitle="Մուտք գործեք հաշիվ դիտելու համար" />
-        <Link to="/login" className="btn">Մուտք</Link>
+        <PageHeader title={t("status.title")} subtitle={t("status.loginNeeded")} />
+        <Link to="/login" className="btn">{t("common.login")}</Link>
       </div>
     );
   }
 
   return (
     <div>
-      <PageHeader title="👤 Կարգավիճակ" />
+      <PageHeader title={t("status.title")} />
       <div className="grid">
         <div className="card card--interactive">
           {status.isLoading && <div className="loading-shimmer" />}
           {status.isError && <p className="field__error">{status.error.message}</p>}
           {status.data &&
             (status.data.has_active_check ? (
-              <p>✅ Ակտիվ չեկ: <strong>{status.data.package?.label}</strong>{status.data.valid_date ? ` (${status.data.valid_date})` : ""}</p>
+              <p>{t("status.active")} <strong>{(mine.data?.checks ?? []).map((c) => pkgLabel(c.package_key, c.label)).join(", ") || status.data.package?.label}</strong>{status.data.valid_date ? ` (${status.data.valid_date})` : ""}</p>
             ) : (
-              <p>❌ Ակտիվ չեկ չունես — <Link to="/checks">ընտրել փաթեթ</Link></p>
+              <p>{t("status.noActive")} <Link to="/checks">{t("status.choosePackage")}</Link></p>
             ))}
           {status.data?.pending_payment && (
-            <p>⏳ Վճարումը ({status.data.pending_payment.package_label}) սպասում է ադմինի հաստատման</p>
+            <p>{t("status.pending", { label: pkgLabel(status.data.pending_payment.package_key, status.data.pending_payment.package_label) })}</p>
           )}
-          {status.data?.is_vip && <p>👑 VIP Կանալ: Ակտիվ է — <Link to="/vip">հղում</Link></p>}
+          {status.data?.is_vip && <p>{t("status.vip")} <Link to="/vip">{t("status.vipLink")}</Link></p>}
         </div>
         <div className="card card--interactive">
-          <h3>Վճարումներ</h3>
+          <h3>{t("status.payments")}</h3>
           {payments.isError && <p className="field__error">{payments.error.message}</p>}
           <ul className="match-list">
             {(payments.data?.results || []).map((p) => (
               <li key={p.id}>
-                {p.package_label} · {new Date(p.created_at).toLocaleDateString()} —{" "}
-                <span className="gradient-text">{paymentStatusLabel[p.status] ?? p.status}</span>
+                {pkgLabel(p.package_key, p.package_label)} · {new Date(p.created_at).toLocaleDateString()} —{" "}
+                <span className="gradient-text">{isPaymentStatus(p.status) ? t(paymentStatusKey[p.status]) : p.status}</span>
               </li>
             ))}
-            {payments.data && !payments.data.results.length && <li className="muted">Դեռ վճարումներ չկան</li>}
+            {payments.data && !payments.data.results.length && <li className="muted">{t("status.noPayments")}</li>}
           </ul>
           {payments.data && payments.data.total_pages > 1 && (
             <div className="filters-toolbar">
@@ -211,12 +216,12 @@ export function Status() {
         <ProfileCard />
         <TelegramCard />
       </div>
-      {mine.data?.active && mine.data.text && (
-        <div className="card">
-          <h3>Ձեր չեկը</h3>
-          <CheckPreview text={mine.data.text} />
+      {mine.data?.checks?.map((c) => (
+        <div key={c.package_key} className="card">
+          <h3>{t("status.yourCheck")} · {pkgLabel(c.package_key, c.label)}</h3>
+          <CheckPreview text={c.text} />
         </div>
-      )}
+      ))}
     </div>
   );
 }

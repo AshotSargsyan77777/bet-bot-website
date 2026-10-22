@@ -4,9 +4,11 @@ import { Link, useNavigate } from "react-router-dom";
 import { api } from "../api/client";
 import { PageHeader } from "../components/PageHeader";
 import { useAuth } from "../context/AuthContext";
+import { useT } from "../i18n";
 
 export function Promo() {
   const { user } = useAuth();
+  const { t } = useT();
   const nav = useNavigate();
   const qc = useQueryClient();
   const [code, setCode] = useState("");
@@ -23,15 +25,15 @@ export function Promo() {
   if (!user) {
     return (
       <div className="card">
-        <PageHeader title="🎁 Պրոմոկոդ" subtitle="Պրոմոկոդ ակտիվացնելու համար մուտք գործեք" />
-        <Link to="/login" className="btn">Մուտք</Link>
+        <PageHeader title={t("promo.title")} subtitle={t("promo.loginNeeded")} />
+        <Link to="/login" className="btn">{t("common.login")}</Link>
       </div>
     );
   }
 
   return (
     <div>
-      <PageHeader title="🎁 Պրոմոկոդ" subtitle="Մեկ օգտագործման 5-նիշ կոդ → պրոմո չեկ մինչև x5" />
+      <PageHeader title={t("promo.title")} subtitle={t("promo.subtitle")} />
       <form
         className="card card--glass"
         style={{ maxWidth: 420 }}
@@ -41,7 +43,7 @@ export function Promo() {
         }}
       >
         <label>
-          Կոդ
+          {t("promo.code")}
           <input
             value={code}
             onChange={(e) => setCode(e.target.value.toUpperCase())}
@@ -52,7 +54,7 @@ export function Promo() {
           />
         </label>
         <button type="submit" style={{ marginTop: "1rem" }} disabled={redeem.isPending || !code.trim()}>
-          {redeem.isPending ? "Ստուգվում է…" : "Ակտիվացնել"}
+          {redeem.isPending ? t("promo.checking") : t("promo.activate")}
         </button>
         {redeem.isError && <p className="field__error" style={{ marginTop: "1rem" }}>{redeem.error.message}</p>}
       </form>

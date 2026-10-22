@@ -1,11 +1,13 @@
 import type { TeamForm } from "../../types/form";
+import { useT } from "../../i18n";
 
 export function TeamFormPanel({ title, form }: { title: string; form?: TeamForm | null }) {
+  const { t } = useT();
   if (!form) {
     return (
       <div className="card">
         <h3>{title}</h3>
-        <p className="muted">Տվյալներ չկան</p>
+        <p className="muted">{t("common.noData")}</p>
       </div>
     );
   }
@@ -20,12 +22,12 @@ export function TeamFormPanel({ title, form }: { title: string; form?: TeamForm 
       <h3>{title}</h3>
       {form.team_name && <p className="team-form-panel__name">{form.team_name}</p>}
       <div className="team-form-panel__record">
-        <span className="chip chip--win">Հ {w}</span>
-        <span className="chip chip--draw">Ո {d}</span>
-        <span className="chip chip--loss">Պ {l}</span>
+        <span className="chip chip--win">{t("game.w")} {w}</span>
+        <span className="chip chip--draw">{t("game.d")} {d}</span>
+        <span className="chip chip--loss">{t("game.l")} {l}</span>
       </div>
       <div className="form-bars">
-        <span className="form-bars__label">Հաղթանակ %</span>
+        <span className="form-bars__label">{t("game.winPct")}</span>
         <div className="form-bars__track">
           <div className="form-bars__fill form-bars__fill--win" style={{ width: `${winPct}%` }} />
         </div>
@@ -34,11 +36,11 @@ export function TeamFormPanel({ title, form }: { title: string; form?: TeamForm 
       <div className="stat-grid">
         <div className="stat-grid__item">
           <span className="stat-grid__val">{form.avg_goals_for ?? "—"}</span>
-          <span className="stat-grid__lbl">GF / խաղ</span>
+          <span className="stat-grid__lbl">{t("game.gfPer")}</span>
         </div>
         <div className="stat-grid__item">
           <span className="stat-grid__val">{form.avg_goals_against ?? "—"}</span>
-          <span className="stat-grid__lbl">GA / խաղ</span>
+          <span className="stat-grid__lbl">{t("game.gaPer")}</span>
         </div>
         <div className="stat-grid__item">
           <span className="stat-grid__val">{form.btts_rate != null ? `${form.btts_rate}%` : "—"}</span>
@@ -46,12 +48,12 @@ export function TeamFormPanel({ title, form }: { title: string; form?: TeamForm 
         </div>
         <div className="stat-grid__item">
           <span className="stat-grid__val">{form.clean_sheet_rate != null ? `${form.clean_sheet_rate}%` : "—"}</span>
-          <span className="stat-grid__lbl">Չ. գոլ</span>
+          <span className="stat-grid__lbl">{t("game.cleanSheet")}</span>
         </div>
       </div>
       {form.matches && form.matches.length > 0 && (
         <>
-          <h4 className="team-form-panel__sub">Վերջին խաղեր</h4>
+          <h4 className="team-form-panel__sub">{t("game.lastGames")}</h4>
           <ul className="match-history">
             {form.matches.map((m, i) => (
               <li key={i} className="match-history__row">
@@ -59,7 +61,7 @@ export function TeamFormPanel({ title, form }: { title: string; form?: TeamForm 
                 <span className="match-history__teams">{m.home} — {m.away}</span>
                 <span className="match-history__score">{m.score}</span>
                 <span className={`match-history__venue match-history__venue--${m.venue}`}>
-                  {m.venue === "home" ? "Տ" : m.venue === "away" ? "Հ" : ""}
+                  {m.venue === "home" ? t("game.venueHome") : m.venue === "away" ? t("game.venueAway") : ""}
                 </span>
               </li>
             ))}

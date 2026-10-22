@@ -3,26 +3,29 @@ import { useEffect, useRef } from "react";
 import { Link, NavLink, Outlet, useLocation } from "react-router-dom";
 import { api } from "../api/client";
 import { useAuth } from "../context/AuthContext";
+import { LangSwitcher, useT, type Key } from "../i18n";
 import { SiteFooter } from "./SiteFooter";
 
-type NavItem = { to: string; label: string; end?: boolean };
+type NavItem = { to: string; label: Key | string; end?: boolean };
 
 const publicLinks: NavItem[] = [
-  { to: "/", label: "Գլխավոր", end: true },
-  { to: "/checks", label: "Չեկեր" },
-  { to: "/results", label: "Արդյունքներ" },
-  { to: "/games", label: "Խաղեր" },
+  { to: "/", label: "nav.home", end: true },
+  { to: "/checks", label: "nav.checks" },
+  { to: "/results", label: "nav.results" },
+  { to: "/games", label: "nav.games" },
 ];
 
 const loggedInLinks: NavItem[] = [
-  { to: "/status", label: "Կարգավիճակ" },
-  { to: "/promo", label: "Պրոմո" },
+  { to: "/status", label: "nav.status" },
+  { to: "/promo", label: "nav.promo" },
   { to: "/vip", label: "VIP" },
   { to: "/help", label: "Support" },
 ];
 
 export function Layout() {
   const { user, logout } = useAuth();
+  const { t } = useT();
+  const label = (l: NavItem) => (l.label.includes(".") ? t(l.label as Key) : l.label);
   const location = useLocation();
   const menuRef = useRef<HTMLDetailsElement>(null);
 
@@ -42,7 +45,7 @@ export function Layout() {
   const links: NavItem[] = [
     ...publicLinks,
     ...(user ? loggedInLinks : []),
-    ...(isVip ? [{ to: "/combinator", label: "Կոնստրուկտոր" }] : []),
+    ...(isVip ? [{ to: "/combinator", label: "nav.combinator" }] : []),
     ...(user?.is_admin ? [{ to: "/admin", label: "Admin" }] : []),
   ];
 
@@ -54,15 +57,17 @@ export function Layout() {
 
           <div className="site-nav__links site-nav__links--desktop">
             {links.map((l) => (
-              <NavLink key={l.to} to={l.to} end={l.end}>{l.label}</NavLink>
+              <NavLink key={l.to} to={l.to} end={l.end}>{label(l)}</NavLink>
             ))}
           </div>
 
+          <LangSwitcher />
+
           <details className="site-nav__menu" ref={menuRef}>
-            <summary className="site-nav__burger" aria-label="Մենյու">☰</summary>
+            <summary className="site-nav__burger" aria-label={t("common.menu")}>☰</summary>
             <div className="site-nav__drawer">
               {links.map((l) => (
-                <NavLink key={l.to} to={l.to} end={l.end}>{l.label}</NavLink>
+                <NavLink key={l.to} to={l.to} end={l.end}>{label(l)}</NavLink>
               ))}
             </div>
           </details>
@@ -70,10 +75,10 @@ export function Layout() {
           {user ? (
             <div className="site-nav__auth">
               <Link to="/status" className="site-nav__user">{user.username}</Link>
-              <button type="button" className="secondary site-nav__logout" onClick={() => void logout()}>Ելք</button>
+              <button type="button" className="secondary site-nav__logout" onClick={() => void logout()}>{t("common.logout")}</button>
             </div>
           ) : (
-            <Link to="/login" className="site-nav__cta">Մուտք</Link>
+            <Link to="/login" className="site-nav__cta">{t("common.login")}</Link>
           )}
         </nav>
       </header>

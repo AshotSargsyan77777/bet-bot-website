@@ -17,6 +17,7 @@ import { Games } from "./pages/Games";
 import { GameDetail } from "./pages/GameDetail";
 import { Combinator } from "./pages/Combinator";
 import { Results } from "./pages/Results";
+import { LangProvider, useT } from "./i18n";
 import "./styles.css";
 
 const qc = new QueryClient({
@@ -38,12 +39,13 @@ function Private({ children }: { children: React.ReactNode }) {
 
 function AdminOnly({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
+  const { t } = useT();
   if (loading) return <div className="loading-shimmer" />;
   if (!user) return <Navigate to="/login" replace />;
   if (!user.is_admin) {
     return (
       <div className="card">
-        <PageHeader title="Admin" subtitle="Մուտք միայն ադմինի համար" />
+        <PageHeader title="Admin" subtitle={t("app.adminOnly")} />
       </div>
     );
   }
@@ -65,10 +67,11 @@ function VipOnly({ children }: { children: React.ReactNode }) {
 }
 
 function NotFound() {
+  const { t } = useT();
   return (
     <div className="card">
-      <PageHeader title="404" subtitle="Էջը չի գտնվել" />
-      <Link to="/" className="btn">Գլխավոր</Link>
+      <PageHeader title="404" subtitle={t("app.notFound")} />
+      <Link to="/" className="btn">{t("common.home")}</Link>
     </div>
   );
 }
@@ -76,6 +79,7 @@ function NotFound() {
 export default function App() {
   return (
     <QueryClientProvider client={qc}>
+      <LangProvider>
       <AuthProvider>
         <BrowserRouter>
           <Routes>
@@ -98,6 +102,7 @@ export default function App() {
           </Routes>
         </BrowserRouter>
       </AuthProvider>
+      </LangProvider>
     </QueryClientProvider>
   );
 }

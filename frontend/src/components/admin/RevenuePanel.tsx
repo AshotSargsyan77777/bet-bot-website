@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { api } from "../../api/client";
+import { useT, usePkgLabel } from "../../i18n";
 
 type Revenue = {
   days: number;
@@ -13,9 +14,10 @@ type Revenue = {
   by_day: { date: string; count: number; amount: number }[];
 };
 
-const amd = (n: number) => `${n.toLocaleString()} դր.`;
-
 export function RevenuePanel() {
+  const { t } = useT();
+  const pkgLabel = usePkgLabel();
+  const amd = (n: number) => `${n.toLocaleString()} ${t("common.amdShort")}`;
   const [days, setDays] = useState(30);
   const rev = useQuery({ queryKey: ["admin-revenue", days], queryFn: () => api<Revenue>(`/api/admin/revenue/?days=${days}`) });
   const r = rev.data;
@@ -25,35 +27,33 @@ export function RevenuePanel() {
 
   return (
     <div className="card">
-      <h3>💵 Եկամուտ</h3>
+      <h3>{t("admin.revenue")}</h3>
       <select value={days} onChange={(e) => setDays(Number(e.target.value))} style={{ maxWidth: 200, marginBottom: "1rem" }}>
-        <option value={7}>Վերջին 7 օր</option>
-        <option value={30}>Վերջին 30 օր</option>
-        <option value={90}>Վերջին 90 օր</option>
+        {[7, 30, 90].map((n) => <option key={n} value={n}>{t("common.lastDays", { n })}</option>)}
       </select>
       {rev.isError && <p className="field__error">{rev.error.message}</p>}
       {r && (
         <>
           <div className="stat-grid stat-grid--wide">
-            <div className="stat-tile"><div className="stat-tile__value">{r.total_amount.toLocaleString()}</div><div className="stat-tile__label">դրամ · {r.total_count} վճարում</div></div>
-            <div className="stat-tile"><div className="stat-tile__value">{r.today_amount.toLocaleString()}</div><div className="stat-tile__label">դրամ այսօր ({r.today_count})</div></div>
-            <div className="stat-tile"><div className="stat-tile__value">{r.total_count ? Math.round(r.total_amount / r.total_count).toLocaleString() : "—"}</div><div className="stat-tile__label">դրամ · միջին վճարում</div></div>
-            <div className="stat-tile"><div className="stat-tile__value">{r.promo_redemptions}</div><div className="stat-tile__label">Պրոմո ակտիվացում</div></div>
+            <div className="stat-tile"><div className="stat-tile__value">{r.total_amount.toLocaleString()}</div><div className="stat-tile__label">{t("admin.revTotal", { n: r.total_count })}</div></div>
+            <div className="stat-tile"><div className="stat-tile__value">{r.today_amount.toLocaleString()}</div><div className="stat-tile__label">{t("admin.revToday", { n: r.today_count })}</div></div>
+            <div className="stat-tile"><div className="stat-tile__value">{r.total_count ? Math.round(r.total_amount / r.total_count).toLocaleString() : "—"}</div><div className="stat-tile__label">{t("admin.revAvg")}</div></div>
+            <div className="stat-tile"><div className="stat-tile__value">{r.promo_redemptions}</div><div className="stat-tile__label">{t("admin.revPromo")}</div></div>
           </div>
-          <h4 style={{ marginTop: "1.25rem" }}>Ըստ փաթեթների</h4>
+          <h4 style={{ marginTop: "1.25rem" }}>{t("admin.byPackage")}</h4>
           <div className="table-wrap">
             <table>
-              <thead><tr><th>Փաթեթ</th><th>Վճարում</th><th>Գումար</th></tr></thead>
+              <thead><tr><th>{t("admin.colPackage")}</th><th>{t("admin.colPayments")}</th><th>{t("admin.colAmount")}</th></tr></thead>
               <tbody>
                 {r.by_package.map((p) => (
-                  <tr key={p.key}><td>{p.label}</td><td>{p.count}</td><td>{amd(p.amount)}</td></tr>
+                  <tr key={p.key}><td>{pkgLabel(p.key, p.label)}</td><td>{p.count}</td><td>{amd(p.amount)}</td></tr>
                 ))}
-                {!r.by_package.length && <tr><td colSpan={3} className="muted">Դեռ վճարումներ չկան</td></tr>}
+                {!r.by_package.length && <tr><td colSpan={3} className="muted">{t("status.noPayments")}</td></tr>}
               </tbody>
             </table>
           </div>
-          <h4 style={{ marginTop: "1.25rem" }}>Ըստ օրերի</h4>
-          {!activeDays.length && <p className="muted">Այս ժամանակահատվածում վճարումներ չկան</p>}
+          <h4 style={{ marginTop: "1.25rem" }}>{t("admin.byDay")}</h4>
+          {!activeDays.length && <p className="muted">{t("admin.noPaymentsPeriod")}</p>}
           {activeDays.map((d) => (
             <div key={d.date} className="form-bars">
               <span className="form-bars__label">{d.date.slice(5)}</span>

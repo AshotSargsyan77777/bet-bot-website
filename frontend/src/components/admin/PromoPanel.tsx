@@ -1,9 +1,11 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { api } from "../../api/client";
+import { useT } from "../../i18n";
 
 export function PromoPanel() {
   const qc = useQueryClient();
+  const { t } = useT();
   const [n, setN] = useState("5");
   const promo = useQuery({
     queryKey: ["admin-promo"],
@@ -19,7 +21,7 @@ export function PromoPanel() {
 
   return (
     <div className="card">
-      <h3>🎁 Պրոմոկոդեր</h3>
+      <h3>{t("admin.promo")}</h3>
       <form
         className="filters-toolbar"
         onSubmit={(e) => {
@@ -28,17 +30,17 @@ export function PromoPanel() {
         }}
       >
         <input type="number" min={1} max={50} value={n} onChange={(e) => setN(e.target.value)} style={{ maxWidth: 90 }} />
-        <button type="submit" disabled={gen.isPending}>Գեներացնել</button>
+        <button type="submit" disabled={gen.isPending}>{t("admin.generate")}</button>
       </form>
       {gen.isError && <p className="field__error">{gen.error.message}</p>}
       {gen.data && (
         <p>
-          Նոր կոդեր: <code>{gen.data.codes.join(" ")}</code>
+          {t("admin.newCodes")} <code>{gen.data.codes.join(" ")}</code>
         </p>
       )}
       {promo.data && (
         <>
-          <p className="muted">Ազատ՝ {promo.data.free} · Օգտագործված՝ {promo.data.used}</p>
+          <p className="muted">{t("admin.promoCounts", { free: promo.data.free, used: promo.data.used })}</p>
           <div className="chip-row">
             {promo.data.free_codes.map((c) => (
               <span key={c} className="chip">{c}</span>

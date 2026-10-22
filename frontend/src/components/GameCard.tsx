@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
 import { LIVE_STATUSES, type GameRow } from "../types/game";
+import { useT } from "../i18n";
 import { FormBars } from "./FormBars";
 
 function statusClass(status: string) {
@@ -9,6 +10,7 @@ function statusClass(status: string) {
 }
 
 export function GameCard({ game, compact }: { game: GameRow; compact?: boolean }) {
+  const { t } = useT();
   const score =
     game.score[0] != null && game.score[1] != null
       ? `${game.score[0]} : ${game.score[1]}`
@@ -32,11 +34,11 @@ export function GameCard({ game, compact }: { game: GameRow; compact?: boolean }
       </footer>
       {!compact && (
         <div className="game-card__forms">
-          <FormBars form={game.home_form} label="Տուն L5" />
-          <FormBars form={game.away_form} label="Հյուր L5" />
+          <FormBars form={game.home_form} label={t("games.homeL5")} />
+          <FormBars form={game.away_form} label={t("games.awayL5")} />
         </div>
       )}
-      <Link className="game-card__link" to={`/games/${game.id}`}>Մանրամասն →</Link>
+      <Link className="game-card__link" to={`/games/${game.id}`}>{t("games.details")}</Link>
     </article>
   );
 }

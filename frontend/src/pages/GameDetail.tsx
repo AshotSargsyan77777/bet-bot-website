@@ -7,6 +7,7 @@ import { H2HList } from "../components/stats/H2HList";
 import { TeamFormPanel } from "../components/stats/TeamFormPanel";
 import type { H2HMatch, TeamForm } from "../types/form";
 import { LIVE_STATUSES } from "../types/game";
+import { useT } from "../i18n";
 
 type DetailPayload = {
   fixture_id: number;
@@ -26,6 +27,7 @@ type DetailPayload = {
 
 export function GameDetail() {
   const { id } = useParams<{ id: string }>();
+  const { t } = useT();
   const [lastN, setLastN] = useState(5);
   const valid = !!id && /^\d+$/.test(id);
 
@@ -38,14 +40,14 @@ export function GameDetail() {
     refetchInterval: (q) => (LIVE_STATUSES.includes(q.state.data?.live?.fixture?.status?.short ?? "") ? 60000 : false),
   });
 
-  if (!valid) return <p className="field__error">Սխալ հղում</p>;
+  if (!valid) return <p className="field__error">{t("game.badLink")}</p>;
   if (isLoading) return <div className="loading-shimmer" />;
   if (isError || !data) {
     return (
       <div className="card">
-        <PageHeader title="Խաղ" />
-        <p className="field__error">{error?.message ?? "Խաղը չի գտնվել"}</p>
-        <Link to="/games" className="btn btn--secondary">← Ետ խաղեր</Link>
+        <PageHeader title={t("game.title")} />
+        <p className="field__error">{error?.message ?? t("game.notFound")}</p>
+        <Link to="/games" className="btn btn--secondary">{t("game.back")}</Link>
       </div>
     );
   }
@@ -76,21 +78,21 @@ export function GameDetail() {
       <div className="card card--glass">
         <div className="filters">
           <div className="field">
-            <span className="field__label">Վերջին խաղեր</span>
+            <span className="field__label">{t("game.lastGames")}</span>
             <select value={lastN} onChange={(e) => setLastN(Number(e.target.value))}>
               {[3, 5, 10].map((n) => <option key={n} value={n}>{n}</option>)}
             </select>
           </div>
         </div>
       </div>
-      {isFetching && <p className="muted">Թարմացում…</p>}
+      {isFetching && <p className="muted">{t("game.refreshing")}</p>}
       {data.stats_error && <p className="field__error">{data.stats_error}</p>}
       <div className="grid" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))" }}>
-        <TeamFormPanel title={`Տուն — վերջին ${lastN}`} form={data.home_form} />
-        <TeamFormPanel title={`Հյուր — վերջին ${lastN}`} form={data.away_form} />
+        <TeamFormPanel title={t("game.homeLast", { n: lastN })} form={data.home_form} />
+        <TeamFormPanel title={t("game.awayLast", { n: lastN })} form={data.away_form} />
       </div>
       <H2HList matches={data.h2h ?? []} />
-      <Link to="/games" className="btn btn--secondary" style={{ marginTop: "1rem" }}>← Ետ խաղեր</Link>
+      <Link to="/games" className="btn btn--secondary" style={{ marginTop: "1rem" }}>{t("game.back")}</Link>
     </div>
   );
 }

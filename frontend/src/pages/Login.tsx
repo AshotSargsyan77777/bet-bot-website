@@ -3,9 +3,11 @@ import { Link, Navigate, useNavigate } from "react-router-dom";
 import { ApiError } from "../api/client";
 import { TelegramLoginButton, type TelegramUser } from "../components/TelegramLoginButton";
 import { useAuth } from "../context/AuthContext";
+import { LangSwitcher, useT } from "../i18n";
 
 export function Login() {
   const { user, login, register, loginWithTelegram } = useAuth();
+  const { t } = useT();
   const nav = useNavigate();
   const [mode, setMode] = useState<"login" | "register">("login");
   const [username, setUsername] = useState("");
@@ -22,10 +24,10 @@ export function Login() {
         await loginWithTelegram(tg);
         nav("/checks");
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Telegram մուտքը չհաջողվեց");
+        setError(err instanceof Error ? err.message : t("login.telegramFailed"));
       }
     },
-    [loginWithTelegram, nav]
+    [loginWithTelegram, nav, t]
   );
 
   if (user) return <Navigate to="/checks" replace />;
@@ -40,8 +42,8 @@ export function Login() {
       else await register(username, email, password);
       nav("/checks");
     } catch (err) {
-      if (err instanceof ApiError && err.status === 401) setError("Սխալ օգտանուն կամ գաղտնաբառ");
-      else setError(err instanceof Error ? err.message : "Սխալ");
+      if (err instanceof ApiError && err.status === 401) setError(t("login.wrong"));
+      else setError(err instanceof Error ? err.message : t("common.error"));
       if (err instanceof ApiError && err.fields) setFieldErrors(err.fields);
     } finally {
       setBusy(false);
@@ -51,16 +53,19 @@ export function Login() {
   return (
     <div className="auth-page">
       <div className="auth-card animate-fade-in">
-        <h2 className="gradient-text">{mode === "login" ? "Մուտք Goalking" : "Գրանցում"}</h2>
+        <div style={{ display: "flex", justifyContent: "flex-end" }}>
+          <LangSwitcher />
+        </div>
+        <h2 className="gradient-text">{mode === "login" ? t("login.titleLogin") : t("login.titleRegister")}</h2>
         <form onSubmit={submit}>
           <div className="field">
-            <span className="field__label">Օգտանուն (ոչ email)</span>
+            <span className="field__label">{t("login.username")}</span>
             <input
               value={username}
               onChange={(e) => setUsername(e.target.value)}
               required
               autoComplete="username"
-              placeholder="օր. Ashot Sargsyan "
+              placeholder={t("login.usernamePh")}
             />
             {fieldErrors.username && <span className="field__error">{fieldErrors.username[0]}</span>}
           </div>
@@ -79,7 +84,7 @@ export function Login() {
             </div>
           )}
           <label>
-            Գաղտնաբառ
+            {t("login.password")}
             <input
               type="password"
               value={password}
@@ -91,14 +96,14 @@ export function Login() {
           </label>
           {error && <p className="field__error">{error}</p>}
           {mode === "register" && (
-            <p className="field__hint">Գաղտնաբառը՝ առնվազն 8 նիշ, ոչ միայն թվեր և ոչ շատ պարզ։</p>
+            <p className="field__hint">{t("login.passwordHint")}</p>
           )}
           <button type="submit" disabled={busy} style={{ marginTop: "1.25rem", width: "100%" }}>
-            {busy ? "…" : mode === "login" ? "Մուտք" : "Գրանցվել"}
+            {busy ? "…" : mode === "login" ? t("login.submitLogin") : t("login.submitRegister")}
           </button>
         </form>
         <div style={{ marginTop: "1.25rem", textAlign: "center" }}>
-          <p className="muted" style={{ marginBottom: "0.5rem" }}>կամ</p>
+          <p className="muted" style={{ marginBottom: "0.5rem" }}>{t("login.or")}</p>
           <TelegramLoginButton onAuth={onTelegram} />
         </div>
         <p style={{ marginTop: "1.25rem", textAlign: "center" }}>
@@ -107,10 +112,10 @@ export function Login() {
               setError("");
               setFieldErrors({});
             }}>
-            {mode === "login" ? "Գրանցում" : "Մուտք"}
+            {mode === "login" ? t("login.toRegister") : t("login.toLogin")}
           </button>
           {" · "}
-          <Link to="/">Գլխավոր</Link>
+          <Link to="/">{t("common.home")}</Link>
         </p>
       </div>
     </div>

@@ -14,21 +14,22 @@ class PaymentStateError(Exception):
     pass
 
 
-def get_active_subscription(user) -> Subscription | None:
+def get_active_subscriptions(user) -> list[Subscription]:
+    """All checks the user can see now (one per package)."""
     if not user or not user.is_authenticated:
-        return None
+        return []
     today = yerevan_today()
     subs = Subscription.objects.filter(user=user, is_active=True).order_by("-created_at")
-    for sub in subs:
-        if sub.package_key == "pkg_5":
-            return sub
-        if sub.valid_date == today:
-            return sub
-    return None
+    return [sub for sub in subs if sub.package_key == "pkg_5" or sub.valid_date == today]
+
+
+def get_active_subscription(user) -> Subscription | None:
+    subs = get_active_subscriptions(user)
+    return subs[0] if subs else None
 
 
 def _activate_subscription(user, check: DailyCheck, from_promo: bool) -> Subscription:
-    Subscription.objects.filter(user=user, is_active=True).update(is_active=False)
+    Subscription.objects.filter(user=user, package_key=check.package_key, is_active=True).update(is_active=False)
     return Subscription.objects.create(
         user=user,
         package_key=check.package_key,
@@ -111,7 +112,7 @@ def normalize_promo_code(code: str) -> str:
 @transaction.atomic
 def redeem_promo(user, code: str) -> tuple[bool, str]:
     code = normalize_promo_code(code)
-    if get_active_subscription(user):
+    if any(sub.from_promo for sub in get_active_subscriptions(user)):
         return False, "already_subscribed"
 
     # Row lock: two concurrent redemptions of the same code cannot both succeed.

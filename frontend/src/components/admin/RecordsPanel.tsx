@@ -1,10 +1,13 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { api, type Paginated } from "../../api/client";
+import { useT, usePkgLabel } from "../../i18n";
 import { resultLabel, type CheckRecord } from "../../types/results";
 
 export function RecordsPanel() {
   const qc = useQueryClient();
+  const { t } = useT();
+  const pkgLabel = usePkgLabel();
   const [status, setStatus] = useState("pending");
   const records = useQuery({
     queryKey: ["admin-records", status],
@@ -26,48 +29,48 @@ export function RecordsPanel() {
 
   return (
     <div className="card">
-      <h3>📈 Չեկերի արդյունքներ</h3>
+      <h3>{t("admin.records")}</h3>
       <div className="filters-toolbar">
         <select value={status} onChange={(e) => setStatus(e.target.value)} style={{ maxWidth: 220 }}>
-          <option value="pending">⏳ Սպասվող</option>
-          <option value="won">✅ Անցած</option>
-          <option value="lost">❌ Չանցած</option>
-          <option value="">Բոլորը</option>
+          <option value="pending">{t("admin.recPending")}</option>
+          <option value="won">{t("admin.recWon")}</option>
+          <option value="lost">{t("admin.recLost")}</option>
+          <option value="">{t("common.all")}</option>
         </select>
         <button type="button" disabled={settle.isPending} onClick={() => settle.mutate()}>
-          {settle.isPending ? "Ստուգվում է…" : "Ստուգել արդյունքները հիմա"}
+          {settle.isPending ? t("admin.checking") : t("admin.settleNow")}
         </button>
       </div>
       {settle.data && (
         <p className="field__hint">
-          {settle.data.ok ? `Ստուգվեց ${settle.data.checked}, որոշվեց ${settle.data.settled}` : settle.data.error}
+          {settle.data.ok ? t("admin.settled", { checked: settle.data.checked ?? 0, settled: settle.data.settled }) : settle.data.error}
         </p>
       )}
       {(settle.isError || setResult.isError) && <p className="field__error">{(settle.error ?? setResult.error)?.message}</p>}
-      <p className="muted">Արդյունքները ավտոմատ ստուգվում են ամեն ժամ (n8n)։ Ձեռքով չեկերը (առանց խաղերի տվյալների) նշեք ներքևում։</p>
+      <p className="muted">{t("admin.recInfo")}</p>
       {records.data?.results.map((r) => (
         <div key={r.id} className="combo-result">
           <p>
-            <strong>{r.date}</strong> · {r.label} {r.combined_odds ? `· ${Number(r.combined_odds).toFixed(2)}x` : ""}{" "}
-            <span className={`chip ${resultLabel[r.status].chip}`}>{resultLabel[r.status].icon} {resultLabel[r.status].text}</span>
+            <strong>{r.date}</strong> · {pkgLabel(r.package_key, r.label)} {r.combined_odds ? `· ${Number(r.combined_odds).toFixed(2)}x` : ""}{" "}
+            <span className={`chip ${resultLabel[r.status].chip}`}>{resultLabel[r.status].icon} {t(resultLabel[r.status].key)}</span>
           </p>
           <ul className="match-list">
             {r.legs.map((l, i) => (
               <li key={i}>{resultLabel[l.result]?.icon ?? "⏳"} {l.fixture} · {l.selection}</li>
             ))}
-            {!r.legs.length && <li className="muted">Ձեռքով չեկ</li>}
+            {!r.legs.length && <li className="muted">{t("admin.manualCheck")}</li>}
           </ul>
           <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
             {(["won", "lost", "void", "pending"] as const).filter((s) => s !== r.status).map((s) => (
               <button key={s} type="button" className="secondary" disabled={setResult.isPending}
                 onClick={() => setResult.mutate({ id: r.id, status: s })}>
-                {resultLabel[s].icon} {resultLabel[s].text}
+                {resultLabel[s].icon} {t(resultLabel[s].key)}
               </button>
             ))}
           </div>
         </div>
       ))}
-      {records.data && !records.data.results.length && <p className="muted">Չեկեր չկան</p>}
+      {records.data && !records.data.results.length && <p className="muted">{t("admin.noRecords")}</p>}
     </div>
   );
 }
