@@ -6,7 +6,7 @@ from django.utils import timezone
 from apps.checks.services.time import yerevan_today
 from apps.games.football_api import FootballApiError, fixtures_by_date, parse_kickoff
 from apps.games.form_stats import aggregate_form, form_slice
-from apps.games.models import FixtureCache
+from apps.games.models import FixtureCache, FixtureSyncLog
 
 logger = logging.getLogger(__name__)
 
@@ -45,6 +45,7 @@ def sync_fixtures_for_date(date: str | None = None):
             },
         )
         count += 1
+    FixtureSyncLog.objects.update_or_create(date=date, defaults={"synced_at": timezone.now()})
     logger.info("Fixture sync for %s: %s fixtures", date, count)
     return {"date": date, "synced": count}
 
@@ -77,3 +78,22 @@ def compute_form_for_date(date: str | None = None, limit: int = 200):
     pending = FixtureCache.objects.filter(kickoff__date=date, stats_computed_at__isnull=True).site_leagues()[:limit]
     done = sum(1 for f in pending if compute_fixture_form(f))
     return {"date": date, "computed": done}
+
+
+def needs_sync(day: str) -> bool:
+    """Today/yesterday/upcoming dates are refreshed every few minutes (live scores, kickoff changes);
+    older dates get one more refresh after they are over so final scores are stored."""
+    from datetime import date as date_cls, datetime, time, timedelta
+    from zoneinfo import ZoneInfo
+
+    from django.conf import settings
+
+    log = FixtureSyncLog.objects.filter(date=day).first()
+    if not log:
+        return True
+    d = date_cls.fromisoformat(day)
+    today = date_cls.fromisoformat(yerevan_today())
+    if d >= today - timedelta(days=1):
+        return timezone.now() - log.synced_at > timedelta(minutes=settings.FIXTURE_REFRESH_MINUTES)
+    day_over = datetime.combine(d + timedelta(days=1), time(6), tzinfo=ZoneInfo(settings.TIME_ZONE))
+    return log.synced_at < day_over

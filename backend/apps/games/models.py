@@ -56,3 +56,10 @@ class TeamFormSnapshot(models.Model):
 
     class Meta:
         unique_together = ("team_id", "last_n", "venue_filter")
+
+
+class FixtureSyncLog(models.Model):
+    """When the fixtures of a (Yerevan) date were last fetched from API-Football."""
+
+    date = models.CharField(max_length=10, unique=True)
+    synced_at = models.DateTimeField()

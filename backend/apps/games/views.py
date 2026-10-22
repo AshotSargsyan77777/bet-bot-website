@@ -1,6 +1,7 @@
 from datetime import date as date_cls
 
 from django.conf import settings
+from django.core.cache import cache
 from django.db.models import Count, F, Q
 from rest_framework import permissions, serializers, status
 from rest_framework.response import Response
@@ -11,7 +12,7 @@ from apps.games.football_api import FootballApiError, fixture_by_id, head_to_hea
 from apps.games.form_stats import aggregate_form
 from apps.games.leagues import site_leagues
 from apps.games.models import FixtureCache
-from apps.games.tasks import compute_fixture_form, sync_fixtures_for_date
+from apps.games.tasks import compute_fixture_form, needs_sync, sync_fixtures_for_date
 from config.pagination import StandardPagination
 
 LIVE_STATUSES = ["1H", "2H", "HT", "ET", "BT", "P", "LIVE", "INT"]
@@ -60,7 +61,8 @@ class GameListView(APIView):
 
         provider_error = None
         day_qs = FixtureCache.objects.filter(kickoff__date=day)
-        if is_configured() and not day_qs.exists():
+        # cache.add: at most one API attempt per date every 2 minutes, even if it fails
+        if is_configured() and needs_sync(day) and cache.add(f"fixture-sync-attempt:{day}", 1, 120):
             result = sync_fixtures_for_date(day)
             provider_error = result.get("error")
 

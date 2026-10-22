@@ -2,11 +2,13 @@ from datetime import datetime, timedelta
 from unittest import mock
 from zoneinfo import ZoneInfo
 
+from django.core.cache import cache
 from django.test import override_settings
+from django.utils import timezone
 from rest_framework.test import APITestCase
 
 from apps.checks.services.time import yerevan_today
-from apps.games.models import FixtureCache, TeamFormSnapshot
+from apps.games.models import FixtureCache, FixtureSyncLog, TeamFormSnapshot
 
 YEREVAN = ZoneInfo("Asia/Yerevan")
 
@@ -63,6 +65,7 @@ class GamesWithProviderTests(APITestCase):
         self.form_mock = p2.start()
         self.addCleanup(p1.stop)
         self.addCleanup(p2.stop)
+        cache.clear()  # sync attempt throttle keys are shared between tests
 
     def test_sync_filter_sort_paginate(self):
         r = self.client.get("/api/games/")
@@ -94,6 +97,22 @@ class GamesWithProviderTests(APITestCase):
         page = self.client.get("/api/games/?page_size=1&page=2").data
         self.assertEqual(page["total_pages"], 2)
         self.assertEqual(len(page["results"]), 1)
+
+    def test_day_with_some_cached_fixtures_is_still_synced_and_refreshed(self):
+        # Regression: a late fixture saved by the previous day's sync made the whole day look "already synced".
+        noon = datetime.fromisoformat(yerevan_today()).replace(hour=1, tzinfo=YEREVAN)
+        FixtureCache.objects.create(api_fixture_id=77, league_id=9999, home_team_name="Late", away_team_name="Night", kickoff=noon)
+        r = self.client.get("/api/games/")
+        self.assertEqual(r.data["count"], 2)
+        self.assertEqual(self.fixtures_mock.call_count, 1)
+
+        self.client.get("/api/games/")  # fresh: no new API call
+        self.assertEqual(self.fixtures_mock.call_count, 1)
+
+        FixtureSyncLog.objects.update(synced_at=timezone.now() - timedelta(minutes=30))
+        cache.clear()
+        self.client.get("/api/games/")  # stale today → refreshed (live scores)
+        self.assertEqual(self.fixtures_mock.call_count, 2)
 
     def test_detail_uses_cache_when_live_call_fails(self):
         from apps.games.football_api import FootballApiError

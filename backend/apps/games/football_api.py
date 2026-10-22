@@ -46,7 +46,8 @@ def _get(path: str, params: dict | None = None, cache_ttl: int = 300) -> Any:
 
 
 def fixtures_by_date(date: str, league: int | None = None, status: str | None = None) -> list:
-    params: dict[str, Any] = {"date": date}
+    # dates are Yerevan calendar days (same as the n8n workflow and kickoff__date filtering)
+    params: dict[str, Any] = {"date": date, "timezone": settings.TIME_ZONE}
     if league:
         params["league"] = league
     if status:
