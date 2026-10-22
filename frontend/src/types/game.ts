@@ -24,7 +24,7 @@ export type GameRow = {
 
 export type GamesResponse = Paginated<GameRow> & {
   date: string;
-  leagues: { id: number; name: string }[];
+  leagues: { id: number; name: string; count: number }[];
   provider_configured: boolean;
   provider_error: string | null;
   form_pending: number;

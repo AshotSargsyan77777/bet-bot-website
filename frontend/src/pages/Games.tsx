@@ -69,7 +69,9 @@ export function Games() {
             <select value={filters.league} onChange={(e) => update("league", e.target.value)}>
               <option value="">Բոլորը</option>
               {leagues.map((l) => (
-                <option key={l.id} value={String(l.id)}>{l.name}</option>
+                <option key={l.id} value={String(l.id)}>
+                  {l.name} ({l.count})
+                </option>
               ))}
             </select>
           </div>

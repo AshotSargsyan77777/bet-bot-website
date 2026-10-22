@@ -70,7 +70,11 @@ class GamesWithProviderTests(APITestCase):
         self.assertEqual(r.data["count"], 2)
         self.assertEqual(FixtureCache.objects.count(), 3)
         # only the bot's leagues, in the configured order (Premier League before La Liga)
-        self.assertEqual([lg["name"] for lg in r.data["leagues"]], ["Premier League", "La Liga"])
+        leagues = r.data["leagues"]
+        self.assertEqual(len(leagues), 11)  # every bot league is always offered in the filter
+        self.assertEqual([(lg["name"], lg["count"]) for lg in leagues[:2]], [("Premier League", 1), ("La Liga", 1)])
+        self.assertEqual(len({lg["id"] for lg in leagues}), 11)  # no duplicates
+        self.assertEqual(sum(lg["count"] for lg in leagues), 2)
         self.assertEqual(self.client.get("/api/games/?q=Other").data["count"], 0)
         self.assertEqual(self.client.get("/api/summary/").data["games_today"], 2)
         first = r.data["results"][0]
