@@ -69,7 +69,7 @@ export function Home() {
             Օրվա <span className="gradient-text">չեկերը</span> և live վիճակագրություն
           </h1>
           <p className="hero__lead animate-fade-in animate-delay-2">
-            Վերջին 5 խաղի ֆորմա, API-Football թարմացումներ, կոնստրուկտոր x9–x20 — ամենը մեկ սև թեմայի
+            Վերջին 5 խաղի ֆորմա, API-Football թարմացումներ, կոնստրուկտոր x5–x20 — ամենը մեկ սև թեմայի
             ինտերֆեյսում։
           </p>
           <div className="hero__actions animate-fade-in animate-delay-3">
@@ -136,7 +136,7 @@ export function Home() {
           <article className="feature-card">
             <div className="feature-card__icon">🎯</div>
             <h3>Կոնստրուկտոր</h3>
-            <p>Ընդհանուր кф 9–20, min/max յուրաքանչյուր ողի — ավտոմատ կոմբինացիաներ։</p>
+            <p>Ընդհանուր кф 5–20, min/max յուրաքանչյուր ողի — ավտոմատ կոմբինացիաներ։</p>
           </article>
           <article className="feature-card">
             <div className="feature-card__icon">👑</div>
