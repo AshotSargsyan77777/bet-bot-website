@@ -1,6 +1,7 @@
 from io import StringIO
 
 from django.contrib.auth import get_user_model
+from django.core.cache import cache
 from django.core.management import call_command
 from rest_framework.test import APITestCase
 
@@ -105,6 +106,9 @@ class AuthFlowTests(APITestCase):
 
 class ApiLanguageTests(APITestCase):
     """Errors follow the Accept-Language header (hy default, en, ru)."""
+
+    def tearDown(self):
+        cache.clear()  # the auth throttle counter would leak into other tests
 
     def register(self, lang=None, **data):
         body = {"username": "lang1", "email": "l@example.com", "password": "12345678", **data}
