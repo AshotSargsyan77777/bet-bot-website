@@ -56,11 +56,12 @@ class PaymentListCreateView(generics.ListCreateAPIView):
 
     @transaction.atomic
     def perform_create(self, serializer):
-        # A new receipt replaces the user's previous pending one (same as the Telegram bot).
-        Payment.objects.filter(user=self.request.user, status=Payment.STATUS_PENDING).exclude(
-            package_key__startswith="combo_"
-        ).update(status=Payment.STATUS_REJECTED)
+        # A new receipt replaces the user's previous pending one for the same package only;
+        # payments for other packages keep waiting for the admin.
         pkg = serializer.validated_data["package_key"]
+        Payment.objects.filter(user=self.request.user, status=Payment.STATUS_PENDING, package_key=pkg).update(
+            status=Payment.STATUS_REJECTED
+        )
         payment = serializer.save(
             user=self.request.user, status=Payment.STATUS_PENDING, amount=PACKAGES[pkg]["price"]
         )
@@ -74,7 +75,7 @@ class PromoRedeemView(APIView):
     MESSAGES = {
         "invalid": "❌ Սխալ կոդ",
         "used": "❌ Այս կոդն արդեն օգտագործված է",
-        "already_subscribed": "✅ Դու արդեն ունես ակտիվ փաթեթ",
+        "already_subscribed": "✅ Դուք այսօր արդեն ստացել եք պրոմո չեկ",
         "not_ready": "⏳ Պրոմո չեկը այսօր դեռ պատրաստ չէ",
     }
 

@@ -20,8 +20,11 @@ class Subscription(models.Model):
         ordering = ["-created_at"]
         indexes = [models.Index(fields=["user", "is_active"], name="sub_user_active_idx")]
         constraints = [
+            # a user may hold several of today's checks, but each package only once
             models.UniqueConstraint(
-                fields=["user"], condition=models.Q(is_active=True), name="one_active_subscription_per_user"
+                fields=["user", "package_key"],
+                condition=models.Q(is_active=True),
+                name="one_active_subscription_per_package",
             )
         ]
 
@@ -66,11 +69,12 @@ class Payment(models.Model):
         ordering = ["-created_at"]
         indexes = [models.Index(fields=["status", "-created_at"], name="payment_status_created_idx")]
         constraints = [
-            # one pending package/VIP payment per user; combinator checks are separate orders
+            # one pending payment per package (a new receipt for the same package replaces the old one);
+            # payments for different packages wait side by side; combinator tiers are separate orders
             models.UniqueConstraint(
-                fields=["user"],
+                fields=["user", "package_key"],
                 condition=models.Q(status="pending") & ~models.Q(package_key__startswith="combo_"),
-                name="one_pending_payment_per_user",
+                name="one_pending_payment_per_package",
             )
         ]
 

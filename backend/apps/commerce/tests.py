@@ -125,6 +125,29 @@ class PaymentFlowTests(APITestCase):
         self.assertEqual(self.client.get("/api/admin/payments/?status=rejected").data["count"], 1)
         self.assertFalse(Subscription.objects.exists())
 
+    def test_payments_for_different_packages_wait_side_by_side(self):
+        """Regression: a VIP receipt used to silently reject a pending check payment."""
+        make_ready("standard_3x")
+        make_ready("standard_5x")
+        self.client.force_authenticate(self.user)
+        for key in ("standard_3x", "standard_5x", "pkg_vip"):
+            self.assertEqual(self.pay(key).status_code, 201)
+        self.assertEqual(Payment.objects.filter(user=self.user, status="pending").count(), 3)
+        self.client.force_authenticate(self.admin)
+        for p in Payment.objects.filter(status="pending"):
+            self.client.post("/api/admin/payments/", {"payment_id": p.id, "action": "approve"}, format="json")
+        self.client.force_authenticate(self.user)
+        mine = self.client.get("/api/checks/mine/").data
+        self.assertEqual(sorted(c["package_key"] for c in mine["checks"]), ["standard_3x", "standard_5x"])
+        self.assertTrue(self.client.get("/api/vip/status/").data["is_vip"])
+        # a promo check can still be added next to the paid ones, but only once
+        make_ready("promo_5x")
+        PromoCode.objects.create(code="AAAAA", created_date=yerevan_today())
+        PromoCode.objects.create(code="BBBBB", created_date=yerevan_today())
+        self.assertEqual(redeem_promo(self.user, "AAAAA"), (True, "promo_5x"))
+        self.assertEqual(redeem_promo(self.user, "BBBBB"), (False, "already_subscribed"))
+        self.assertEqual(len(self.client.get("/api/checks/mine/").data["checks"]), 3)
+
     def test_one_pending_payment_constraint(self):
         Payment.objects.create(user=self.user, package_key="pkg_vip", receipt="r.png")
         with self.assertRaises(IntegrityError):

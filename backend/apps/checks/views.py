@@ -23,7 +23,7 @@ from apps.checks.services.records import record_published_check, results_stats, 
 from apps.checks.services.settlement import settle_pending_records
 from apps.checks.services.time import yerevan_today
 from apps.combinator.pool import store_combinator_selections
-from apps.commerce.services import get_active_subscription
+from apps.commerce.services import get_active_subscriptions
 
 logger = logging.getLogger(__name__)
 
@@ -90,19 +90,21 @@ class MyCheckView(APIView):
                     ],
                 }
             )
-        sub = get_active_subscription(request.user)
-        if not sub:
+        subs = get_active_subscriptions(request.user)
+        if not subs:
             return Response({"active": False})
-        check = DailyCheck.objects.filter(package_key=sub.package_key).first()
-        return Response(
+        bodies = {c.package_key: c.body_text for c in DailyCheck.objects.filter(package_key__in=[s.package_key for s in subs])}
+        checks = [
             {
-                "active": True,
                 "package_key": sub.package_key,
+                "label": PACKAGES[sub.package_key]["label"],
                 "valid_date": sub.valid_date,
-                "text": sub.snapshot_text or (check.body_text if check else ""),
+                "text": sub.snapshot_text or bodies.get(sub.package_key, ""),
                 "from_promo": sub.from_promo,
             }
-        )
+            for sub in subs
+        ]
+        return Response({"active": True, **checks[0], "checks": checks})
 
 
 class InternalPackagesWebhook(APIView):
