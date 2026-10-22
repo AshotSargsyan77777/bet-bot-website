@@ -11,6 +11,8 @@ The workflow export itself is not committed because it contains API keys.
 | `nodes/parse_predictions.js` | Parse Predictions | Predictions + full-season team stats |
 | `nodes/deep_stats.js` | Deep Stats | Last 8 matches per team (xG, shots, corners, cards), injuries, standings; cached in workflow static data. Replace `__API_KEY__` with the API-Football key |
 | `nodes/analyze.js` | Analyze Matches | Analysis-first probability model (goals, corners, cards); market weight 25% |
-| `nodes/generate_packages.js` | Generate Packages | Package search; corners/cards at most half of the legs (max 2) |
+| `nodes/generate_packages.js` | Generate Packages | Package search; corners/cards at most half of the legs (max 2); selections carry `fixture_id` for result settlement |
 
 Test the chain locally with mocked API responses: `node n8n/test_harness.js`
+
+HTTP nodes `Send to Website` and `Settle Results` (`/api/internal/settle/`) are added disabled; enable them after the site is deployed.

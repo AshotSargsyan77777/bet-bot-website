@@ -10,6 +10,7 @@ export function SiteFooter({ showCombinator = false }: { showCombinator?: boolea
         </div>
         <div className="site-footer__links">
           <Link to="/checks">Չեկեր</Link>
+          <Link to="/results">Արդյունքներ</Link>
           <Link to="/games">Խաղեր</Link>
           {showCombinator && <Link to="/combinator">Կոնստրուկտոր</Link>}
           <Link to="/vip">VIP</Link>

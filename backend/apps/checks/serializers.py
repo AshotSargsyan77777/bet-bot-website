@@ -1,7 +1,7 @@
 from rest_framework import serializers
 
 from apps.checks.constants import PACKAGES, PURCHASABLE_KEYS
-from apps.checks.models import AppSettings, DailyCheck
+from apps.checks.models import AppSettings, CheckRecord, DailyCheck
 from apps.checks.services.checks_logic import check_is_ready, get_check_display_text
 
 
@@ -59,3 +59,25 @@ def build_catalog() -> list[dict]:
             }
         )
     return items
+
+
+class CheckRecordSerializer(serializers.ModelSerializer):
+    label = serializers.CharField(read_only=True)
+    legs = serializers.SerializerMethodField()
+
+    class Meta:
+        model = CheckRecord
+        fields = ("id", "package_key", "label", "date", "combined_odds", "quality", "status", "body_text", "legs", "settled_at")
+
+    def get_legs(self, obj):
+        if obj.legs_result:
+            return obj.legs_result
+        return [
+            {"fixture": s.get("fixture"), "market": s.get("market"), "selection": s.get("selection"),
+             "odd": s.get("odd"), "result": "pending"}
+            for s in obj.selections_json or []
+        ]
+
+
+class AdminRecordUpdateSerializer(serializers.Serializer):
+    status = serializers.ChoiceField(choices=[c[0] for c in CheckRecord.STATUS_CHOICES])

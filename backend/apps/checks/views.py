@@ -2,16 +2,25 @@ import hmac
 import logging
 
 from django.conf import settings
-from rest_framework import permissions, status
+from django.utils import timezone
+from rest_framework import generics, permissions, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.accounts.permissions import IsAdminUser
 from apps.checks.constants import N8N_KEYS
-from apps.checks.models import AppSettings, DailyCheck
-from apps.checks.serializers import AdminCheckUpdateSerializer, DailyCheckSerializer, build_catalog
+from apps.checks.models import AppSettings, CheckRecord, DailyCheck
+from apps.checks.serializers import (
+    AdminCheckUpdateSerializer,
+    AdminRecordUpdateSerializer,
+    CheckRecordSerializer,
+    DailyCheckSerializer,
+    build_catalog,
+)
 from apps.checks.services.checks_logic import ready_package_keys
 from apps.checks.services.n8n import apply_n8n_packages
+from apps.checks.services.records import record_published_check, results_stats, visible_history
+from apps.checks.services.settlement import settle_pending_records
 from apps.checks.services.time import yerevan_today
 from apps.commerce.services import get_active_subscription
 
@@ -59,6 +68,7 @@ class PublicSummaryView(APIView):
                 "games_today": games_today.count(),
                 "live_games": games_today.filter(status_short__in=LIVE_STATUSES).count(),
                 "games_provider_configured": bool(settings.API_FOOTBALL_KEY),
+                "results_30d": {k: v for k, v in results_stats(30).items() if k in ("won", "lost", "settled", "win_rate")},
             }
         )
 
@@ -128,5 +138,92 @@ class AdminChecksView(APIView):
         app = AppSettings.get()
         app.checks_date = yerevan_today()
         app.save(update_fields=["checks_date"])
+        if check.is_available:
+            check.selections_json = []  # manual text: no structured legs, result is set by the admin
+            check.save(update_fields=["selections_json"])
+            record_published_check(check, app.checks_date)
+        else:
+            check.current_record = None
+            check.save(update_fields=["current_record"])
         logger.info("Admin %s updated check %s", request.user.username, check.package_key)
         return Response(DailyCheckSerializer(check, context={"checks_date": app.checks_date}).data)
+
+
+def _check_internal_key(request) -> bool:
+    key = request.headers.get("X-Internal-Key") or ""
+    expected = settings.N8N_INTERNAL_KEY
+    return bool(expected) and hmac.compare_digest(key.encode(), expected.encode())
+
+
+class CheckHistoryView(generics.ListAPIView):
+    """Public archive of past checks with their results (today's checks stay paid)."""
+
+    permission_classes = (permissions.AllowAny,)
+    serializer_class = CheckRecordSerializer
+
+    def get_queryset(self):
+        qs = visible_history().order_by("-date", "package_key", "-created_at")
+        package = self.request.query_params.get("package")
+        if package:
+            qs = qs.filter(package_key=package)
+        result = self.request.query_params.get("status")
+        if result in dict(CheckRecord.STATUS_CHOICES):
+            qs = qs.filter(status=result)
+        return qs
+
+
+class CheckHistoryStatsView(APIView):
+    permission_classes = (permissions.AllowAny,)
+
+    def get(self, request):
+        try:
+            days = min(max(int(request.query_params.get("days", 30)), 1), 365)
+        except ValueError:
+            days = 30
+        return Response(results_stats(days))
+
+
+class InternalSettleWebhook(APIView):
+    """Called by n8n (hourly) to settle finished checks."""
+
+    authentication_classes = ()
+    permission_classes = (permissions.AllowAny,)
+    throttle_classes = ()
+
+    def post(self, request):
+        if not _check_internal_key(request):
+            return Response({"error": "unauthorized", "code": "unauthorized"}, status=status.HTTP_401_UNAUTHORIZED)
+        return Response(settle_pending_records())
+
+
+class AdminRecordsView(generics.ListAPIView):
+    permission_classes = (IsAdminUser,)
+    serializer_class = CheckRecordSerializer
+
+    def get_queryset(self):
+        qs = CheckRecord.objects.all()
+        result = self.request.query_params.get("status")
+        if result in dict(CheckRecord.STATUS_CHOICES):
+            qs = qs.filter(status=result)
+        return qs
+
+    def post(self, request):
+        """Runs automatic settlement now."""
+        return Response(settle_pending_records())
+
+
+class AdminRecordDetailView(APIView):
+    permission_classes = (IsAdminUser,)
+
+    def patch(self, request, pk: int):
+        record = CheckRecord.objects.filter(pk=pk).first()
+        if not record:
+            return Response({"error": "Չեկը չի գտնվել", "code": "not_found"}, status=status.HTTP_404_NOT_FOUND)
+        serializer = AdminRecordUpdateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        record.status = serializer.validated_data["status"]
+        record.settled_manually = record.status != CheckRecord.STATUS_PENDING
+        record.settled_at = timezone.now() if record.settled_manually else None
+        record.save(update_fields=["status", "settled_manually", "settled_at"])
+        logger.info("Admin %s set record %s to %s", request.user.username, pk, record.status)
+        return Response(CheckRecordSerializer(record).data)

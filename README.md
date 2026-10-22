@@ -122,7 +122,20 @@ Telegram bot service built from this repository is not affected.
    - Volume: mount path `/app/media` (keeps uploaded receipts across deploys)
 3. Variables of the web service:
    `DATABASE_URL=${{Postgres.DATABASE_URL}}`, `DJANGO_SECRET_KEY`, `DJANGO_DEBUG=0`, `USE_LOCMEM_CACHE=1`,
-   `N8N_INTERNAL_KEY`, `CARD_NUMBER`, `VIP_CHANNEL_LINK`, `API_FOOTBALL_KEY`.
+   `N8N_INTERNAL_KEY`, `CARD_NUMBER`, `VIP_CHANNEL_LINK`, `API_FOOTBALL_KEY`,
+   `TELEGRAM_BOT_TOKEN`, `TELEGRAM_BOT_USERNAME`.
    The Railway domain is added to `ALLOWED_HOSTS` / `CSRF_TRUSTED_ORIGINS` automatically.
 4. After the first deploy, create an admin from the service shell: `python manage.py createsuperuser`.
-5. n8n webhook URL: `https://<railway-domain>/api/internal/packages/`.
+5. n8n webhook URLs: `https://<railway-domain>/api/internal/packages/` (checks) and
+   `https://<railway-domain>/api/internal/settle/` (hourly result settlement), header `X-Internal-Key`.
+6. Telegram login: in @BotFather send `/setdomain`, choose the bot and enter the Railway domain.
+
+## Check results, archive, Telegram
+
+- Every published check version is stored (`CheckRecord`). Results are settled automatically from final
+  match data (API-Football): `POST /api/internal/settle/` (n8n, hourly) or the admin button.
+  Checks without match data (manual texts) are settled by the admin.
+- `/results` (public) shows past days' checks with win/loss and a 30-day success rate; today's checks stay paid.
+- Telegram Login Widget (`/api/auth/telegram/`) signs users in; linked users get Telegram messages for
+  payment approval/rejection, support replies and "today's checks are ready" (once a day).
+- Admin revenue: `/api/admin/revenue/?days=30` (approved payments by package and day).

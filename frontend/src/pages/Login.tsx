@@ -1,10 +1,11 @@
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import { Link, Navigate, useNavigate } from "react-router-dom";
 import { ApiError } from "../api/client";
+import { TelegramLoginButton, type TelegramUser } from "../components/TelegramLoginButton";
 import { useAuth } from "../context/AuthContext";
 
 export function Login() {
-  const { user, login, register } = useAuth();
+  const { user, login, register, loginWithTelegram } = useAuth();
   const nav = useNavigate();
   const [mode, setMode] = useState<"login" | "register">("login");
   const [username, setUsername] = useState("");
@@ -13,6 +14,19 @@ export function Login() {
   const [error, setError] = useState("");
   const [fieldErrors, setFieldErrors] = useState<Record<string, string[]>>({});
   const [busy, setBusy] = useState(false);
+
+  const onTelegram = useCallback(
+    async (tg: TelegramUser) => {
+      setError("");
+      try {
+        await loginWithTelegram(tg);
+        nav("/checks");
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Telegram մուտքը չհաջողվեց");
+      }
+    },
+    [loginWithTelegram, nav]
+  );
 
   if (user) return <Navigate to="/checks" replace />;
 
@@ -83,6 +97,10 @@ export function Login() {
             {busy ? "…" : mode === "login" ? "Մուտք" : "Գրանցվել"}
           </button>
         </form>
+        <div style={{ marginTop: "1.25rem", textAlign: "center" }}>
+          <p className="muted" style={{ marginBottom: "0.5rem" }}>կամ</p>
+          <TelegramLoginButton onAuth={onTelegram} />
+        </div>
         <p style={{ marginTop: "1.25rem", textAlign: "center" }}>
           <button type="button" className="secondary" onClick={() => {
               setMode(mode === "login" ? "register" : "login");

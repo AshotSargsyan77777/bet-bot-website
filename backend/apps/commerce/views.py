@@ -3,9 +3,11 @@ import mimetypes
 
 from django.conf import settings
 from django.db import transaction
-from django.db.models import Q
+from django.db.models import Count, Q, Sum
+from django.db.models.functions import TruncDate
 from django.http import FileResponse
 from django.shortcuts import get_object_or_404
+from django.utils import timezone
 from rest_framework import generics, permissions, status
 from rest_framework.exceptions import NotFound
 from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
@@ -58,7 +60,10 @@ class PaymentListCreateView(generics.ListCreateAPIView):
         Payment.objects.filter(user=self.request.user, status=Payment.STATUS_PENDING).update(
             status=Payment.STATUS_REJECTED
         )
-        payment = serializer.save(user=self.request.user, status=Payment.STATUS_PENDING)
+        pkg = serializer.validated_data["package_key"]
+        payment = serializer.save(
+            user=self.request.user, status=Payment.STATUS_PENDING, amount=PACKAGES[pkg]["price"]
+        )
         logger.info("Payment %s created by %s for %s", payment.id, self.request.user.username, payment.package_key)
 
 
@@ -227,3 +232,53 @@ class AdminCandidateDetailView(generics.RetrieveUpdateDestroyAPIView):
     serializer_class = SelectionCandidateSerializer
     queryset = SelectionCandidate.objects.all()
     http_method_names = ["get", "patch", "delete", "head", "options"]
+
+
+class AdminRevenueView(APIView):
+    """Approved payments (income) for the last N days, by package and by day (Yerevan time)."""
+
+    permission_classes = (IsAdminUser,)
+
+    def get(self, request):
+        from datetime import datetime, time, timedelta
+        from zoneinfo import ZoneInfo
+
+        try:
+            days = min(max(int(request.query_params.get("days", 30)), 1), 366)
+        except ValueError:
+            days = 30
+        tz = ZoneInfo(settings.TIME_ZONE)
+        today = timezone.localdate(timezone=tz)
+        start = datetime.combine(today - timedelta(days=days - 1), time.min, tzinfo=tz)
+        approved = Payment.objects.filter(status=Payment.STATUS_APPROVED, reviewed_at__gte=start)
+
+        totals = approved.aggregate(amount=Sum("amount"), count=Count("id"))
+        today_start = datetime.combine(today, time.min, tzinfo=tz)
+        today_totals = approved.filter(reviewed_at__gte=today_start).aggregate(amount=Sum("amount"), count=Count("id"))
+        by_package = [
+            {"key": r["package_key"], "label": PACKAGES.get(r["package_key"], {}).get("label", r["package_key"]),
+             "count": r["count"], "amount": r["amount"] or 0}
+            for r in approved.values("package_key").annotate(count=Count("id"), amount=Sum("amount")).order_by("-amount")
+        ]
+        per_day = {
+            r["day"].isoformat(): {"count": r["count"], "amount": r["amount"] or 0}
+            for r in approved.annotate(day=TruncDate("reviewed_at", tzinfo=tz))
+            .values("day").annotate(count=Count("id"), amount=Sum("amount"))
+        }
+        by_day = []
+        for i in range(days):
+            d = (today - timedelta(days=days - 1 - i)).isoformat()
+            by_day.append({"date": d, **per_day.get(d, {"count": 0, "amount": 0})})
+        promo_used = PromoCode.objects.filter(used_at__gte=start).count()
+        return Response(
+            {
+                "days": days,
+                "total_amount": totals["amount"] or 0,
+                "total_count": totals["count"],
+                "today_amount": today_totals["amount"] or 0,
+                "today_count": today_totals["count"],
+                "promo_redemptions": promo_used,
+                "by_package": by_package,
+                "by_day": by_day,
+            }
+        )

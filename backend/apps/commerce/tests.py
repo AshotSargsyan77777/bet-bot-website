@@ -2,6 +2,7 @@ import io
 import shutil
 import tempfile
 import threading
+from datetime import timedelta
 
 from django.contrib.auth import get_user_model
 from django.core.files.uploadedfile import SimpleUploadedFile
@@ -223,3 +224,32 @@ class CandidatesAndStatsTests(APITestCase):
         anon = APIClient()
         for url in ("/api/admin/payments/", "/api/admin/promo/", "/api/admin/support/", "/api/admin/candidates/"):
             self.assertEqual(anon.get(url).status_code, 401, url)
+
+
+class RevenueTests(APITestCase):
+    def test_revenue_by_package_and_day(self):
+        from django.utils import timezone
+
+        admin = User.objects.create_user("rev", "rev@example.com", "x", is_staff=True)
+        buyer = User.objects.create_user("rb", "rb@example.com", "x")
+        now = timezone.now()
+        Payment.objects.create(user=buyer, package_key="standard_3x", receipt="a.png", amount=2000,
+                               status="approved", reviewed_at=now)
+        Payment.objects.create(user=buyer, package_key="pkg_vip", receipt="b.png", amount=5000,
+                               status="approved", reviewed_at=now - timedelta(days=2))
+        Payment.objects.create(user=buyer, package_key="pkg_vip", receipt="c.png", amount=5000, status="rejected")
+        self.client.force_authenticate(buyer)
+        self.assertEqual(self.client.get("/api/admin/revenue/").status_code, 403)
+        self.client.force_authenticate(admin)
+        r = self.client.get("/api/admin/revenue/?days=7").data
+        self.assertEqual((r["total_amount"], r["total_count"], r["today_amount"]), (7000, 2, 2000))
+        self.assertEqual(r["by_package"][0]["key"], "pkg_vip")
+        self.assertEqual(len(r["by_day"]), 7)
+        self.assertEqual(sum(d["amount"] for d in r["by_day"]), 7000)
+
+    @override_settings(MEDIA_ROOT=MEDIA)
+    def test_payment_amount_saved(self):
+        buyer = User.objects.create_user("amt", "amt@example.com", "x")
+        self.client.force_authenticate(buyer)
+        self.client.post("/api/payments/", {"package_key": "pkg_vip", "receipt": image_file()}, format="multipart")
+        self.assertEqual(Payment.objects.get(user=buyer).amount, 5000)

@@ -14,6 +14,7 @@ type Summary = {
   games_today: number;
   live_games: number;
   games_provider_configured: boolean;
+  results_30d?: { won: number; lost: number; settled: number; win_rate: number | null };
 };
 
 /** Illustrates the format of a check (static marketing example, not a real pick). */
@@ -55,7 +56,10 @@ export function Home() {
     { label: "Պատրաստ չեկեր այսօր", value: s ? `${s.ready_packages}/${s.total_packages}` : "—" },
     { label: "Այսօրվա խաղեր", value: s ? String(s.games_today) : "—" },
     { label: "Live հիմա", value: s ? String(s.live_games) : "—" },
-    { label: "Չեկերի ամսաթիվ", value: s?.checks_date ?? "—" },
+    {
+      label: "Անցած չեկեր (30 օր)",
+      value: s?.results_30d?.settled ? `${s.results_30d.won}/${s.results_30d.settled}` : "—",
+    },
   ];
 
   return (

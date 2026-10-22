@@ -4,6 +4,8 @@ import { CandidatesPanel } from "../components/admin/CandidatesPanel";
 import { ChecksPanel } from "../components/admin/ChecksPanel";
 import { PaymentsPanel } from "../components/admin/PaymentsPanel";
 import { PromoPanel } from "../components/admin/PromoPanel";
+import { RecordsPanel } from "../components/admin/RecordsPanel";
+import { RevenuePanel } from "../components/admin/RevenuePanel";
 import { SupportPanel } from "../components/admin/SupportPanel";
 import { PageHeader } from "../components/PageHeader";
 import { AdminStatsGrid, type StatsPayload } from "../components/stats/AdminStatsGrid";
@@ -22,8 +24,10 @@ export function Admin() {
         {stats.isError ? <p className="field__error">{stats.error.message}</p> : <AdminStatsGrid data={stats.data} />}
       </div>
       <PaymentsPanel />
+      <RevenuePanel />
       <SupportPanel />
       <ChecksPanel />
+      <RecordsPanel />
       <PromoPanel />
       <CandidatesPanel />
     </div>

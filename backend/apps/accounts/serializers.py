@@ -49,11 +49,22 @@ class RegisterSerializer(serializers.ModelSerializer):
 class UserSerializer(serializers.ModelSerializer):
     is_admin = serializers.SerializerMethodField()
     is_vip = serializers.SerializerMethodField()
+    has_password = serializers.SerializerMethodField()
+    telegram = serializers.SerializerMethodField()
 
     class Meta:
         model = User
-        fields = ("id", "username", "email", "is_admin", "is_vip", "date_joined")
-        read_only_fields = ("id", "username", "is_admin", "is_vip", "date_joined")
+        fields = ("id", "username", "email", "is_admin", "is_vip", "has_password", "telegram", "date_joined")
+        read_only_fields = ("id", "username", "is_admin", "is_vip", "has_password", "telegram", "date_joined")
+
+    def get_has_password(self, obj):
+        return obj.has_usable_password()
+
+    def get_telegram(self, obj):
+        account = getattr(obj, "telegram", None) if hasattr(obj, "telegram") else None
+        if not account:
+            return None
+        return {"username": account.username, "first_name": account.first_name, "notifications": account.notifications}
 
     def get_is_admin(self, obj):
         return user_is_admin(obj)
@@ -71,14 +82,32 @@ class UserSerializer(serializers.ModelSerializer):
 
 
 class ChangePasswordSerializer(serializers.Serializer):
-    current_password = serializers.CharField(write_only=True)
+    # Users who signed up with Telegram have no password yet and may set one without the current password.
+    current_password = serializers.CharField(write_only=True, required=False, allow_blank=True)
     new_password = serializers.CharField(write_only=True, min_length=8, max_length=128)
 
-    def validate_current_password(self, value):
-        if not self.context["request"].user.check_password(value):
-            raise serializers.ValidationError("Ընթացիկ գաղտնաբառը սխալ է")
-        return value
+    def validate(self, attrs):
+        user = self.context["request"].user
+        if user.has_usable_password() and not user.check_password(attrs.get("current_password") or ""):
+            raise serializers.ValidationError({"current_password": ["Ընթացիկ գաղտնաբառը սխալ է"]})
+        return attrs
 
     def validate_new_password(self, value):
         validate_password(value, user=self.context["request"].user)
         return value
+
+
+class TelegramAuthSerializer(serializers.Serializer):
+    """Payload of the Telegram Login Widget callback."""
+
+    id = serializers.IntegerField()
+    auth_date = serializers.IntegerField()
+    hash = serializers.CharField(max_length=128)
+    first_name = serializers.CharField(max_length=256, required=False, allow_blank=True)
+    last_name = serializers.CharField(max_length=256, required=False, allow_blank=True)
+    username = serializers.CharField(max_length=64, required=False, allow_blank=True)
+    photo_url = serializers.CharField(max_length=500, required=False, allow_blank=True)
+
+
+class TelegramSettingsSerializer(serializers.Serializer):
+    notifications = serializers.BooleanField()

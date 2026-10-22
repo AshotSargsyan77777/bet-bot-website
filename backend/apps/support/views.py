@@ -5,6 +5,7 @@ from rest_framework import generics
 from rest_framework.throttling import ScopedRateThrottle
 
 from apps.accounts.permissions import IsAdminUser
+from apps.accounts.telegram import notify_user
 from apps.support.models import SupportTicket
 from apps.support.serializers import AdminSupportTicketSerializer, SupportTicketSerializer
 
@@ -52,6 +53,9 @@ class AdminSupportDetailView(generics.RetrieveUpdateAPIView):
 
     def perform_update(self, serializer):
         extra = {}
-        if "reply" in serializer.validated_data:
+        reply = serializer.validated_data.get("reply")
+        if reply:
             extra = {"replied_at": timezone.now(), "replied_by": self.request.user, "is_read": True}
-        serializer.save(**extra)
+        ticket = serializer.save(**extra)
+        if reply:
+            notify_user(ticket.user, f"📩 Պատասխան ադմինից:\n\n{reply}\n\n________________\nGoalking Support")

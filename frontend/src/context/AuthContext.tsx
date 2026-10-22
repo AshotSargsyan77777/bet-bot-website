@@ -8,6 +8,8 @@ export type User = {
   email: string;
   is_admin: boolean;
   is_vip: boolean;
+  has_password: boolean;
+  telegram: { username: string; first_name: string; notifications: boolean } | null;
   date_joined?: string;
 };
 
@@ -16,6 +18,7 @@ type AuthCtx = {
   loading: boolean;
   login: (username: string, password: string) => Promise<void>;
   register: (username: string, email: string, password: string) => Promise<void>;
+  loginWithTelegram: (data: object) => Promise<void>;
   logout: () => Promise<void>;
   refreshMe: () => Promise<void>;
 };
@@ -59,6 +62,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await refreshMe();
   };
 
+  const loginWithTelegram = async (data: object) => {
+    const tokens = await api<{ access: string; refresh: string }>("/api/auth/telegram/", {
+      method: "POST",
+      json: data,
+      auth: false,
+    });
+    setTokens(tokens.access, tokens.refresh);
+    qc.clear();
+    await refreshMe();
+  };
+
   const register = async (username: string, email: string, password: string) => {
     await api("/api/auth/register/", {
       method: "POST",
@@ -79,7 +93,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, register, logout, refreshMe }}>
+    <AuthContext.Provider value={{ user, loading, login, register, loginWithTelegram, logout, refreshMe }}>
       {children}
     </AuthContext.Provider>
   );

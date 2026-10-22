@@ -9,6 +9,7 @@ type NavItem = { to: string; label: string; end?: boolean };
 const publicLinks: NavItem[] = [
   { to: "/", label: "Գլխավոր", end: true },
   { to: "/checks", label: "Չեկեր" },
+  { to: "/results", label: "Արդյունքներ" },
   { to: "/games", label: "Խաղեր" },
 ];
 

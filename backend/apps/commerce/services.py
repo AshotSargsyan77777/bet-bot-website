@@ -1,7 +1,9 @@
+from django.conf import settings
 from django.db import transaction
 from django.utils import timezone
 
-from apps.checks.constants import PROMO_PACKAGES
+from apps.accounts.telegram import notify_user
+from apps.checks.constants import PACKAGES, PROMO_PACKAGES
 from apps.checks.models import DailyCheck
 from apps.checks.services.checks_logic import check_is_ready, get_check_display_text
 from apps.checks.services.time import yerevan_today
@@ -25,13 +27,14 @@ def get_active_subscription(user) -> Subscription | None:
     return None
 
 
-def _activate_subscription(user, package_key: str, text: str, from_promo: bool) -> Subscription:
+def _activate_subscription(user, check: DailyCheck, from_promo: bool) -> Subscription:
     Subscription.objects.filter(user=user, is_active=True).update(is_active=False)
     return Subscription.objects.create(
         user=user,
-        package_key=package_key,
+        package_key=check.package_key,
         valid_date=yerevan_today(),
-        snapshot_text=text,
+        snapshot_text=get_check_display_text(check),
+        record=check.current_record,
         from_promo=from_promo,
     )
 
@@ -53,10 +56,14 @@ def approve_payment(payment_id: int, reviewer=None) -> Payment:
     payment.reviewed_by = reviewer
     payment.save(update_fields=["status", "reviewed_at", "reviewed_by"])
 
+    label = PACKAGES.get(pkg_key, {}).get("label", pkg_key)
     if pkg_key == "pkg_vip":
         VipMember.objects.get_or_create(user=payment.user)
+        link = settings.VIP_CHANNEL_LINK
+        notify_user(payment.user, f"✅ VIP մուտքը հաստատվեց։" + (f"\n👑 {link}" if link else ""))
     else:
-        _activate_subscription(payment.user, pkg_key, get_check_display_text(check), from_promo=False)
+        sub = _activate_subscription(payment.user, check, from_promo=False)
+        notify_user(payment.user, f"✅ Վճարումը հաստատվեց՝ {label}\n\n{sub.snapshot_text}")
     return payment
 
 
@@ -69,6 +76,8 @@ def reject_payment(payment_id: int, reviewer=None) -> Payment:
     payment.reviewed_at = timezone.now()
     payment.reviewed_by = reviewer
     payment.save(update_fields=["status", "reviewed_at", "reviewed_by"])
+    label = PACKAGES.get(payment.package_key, {}).get("label", payment.package_key)
+    notify_user(payment.user, f"❌ Ձեր վճարումը ({label}) մերժվեց։ Հարցերի դեպքում գրեք support-ին կայքում։")
     return payment
 
 
@@ -102,5 +111,5 @@ def redeem_promo(user, code: str) -> tuple[bool, str]:
     entry.used_at = timezone.now()
     entry.save(update_fields=["used_by", "used_at"])
 
-    _activate_subscription(user, check.package_key, get_check_display_text(check), from_promo=True)
+    _activate_subscription(user, check, from_promo=True)
     return True, check.package_key
