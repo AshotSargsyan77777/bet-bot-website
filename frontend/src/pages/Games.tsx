@@ -6,10 +6,12 @@ import { PageHeader } from "../components/PageHeader";
 import { useDebouncedValue } from "../hooks/useDebouncedValue";
 import { LIVE_STATUSES, type GamesResponse } from "../types/game";
 import { emptyGameFilters, gameQueryParams, type GameFilters } from "../utils/gameFilters";
+import { useT } from "../i18n";
 
 const PAGE_SIZE = 24;
 
 export function Games() {
+  const { t } = useT();
   const [filters, setFilters] = useState<GameFilters>(emptyGameFilters);
   const [page, setPage] = useState(1);
 
@@ -45,29 +47,27 @@ export function Games() {
     <div>
       <PageHeader
         eyebrow="API-Football"
-        title="⚽ Խաղեր և վիճակագրություն"
-        subtitle={data ? `Ամսաթիվ: ${data.date}` : "Ֆիլտրեր ըստ լիգայի, կարգավիճակի և ձևի"}
+        title={t("games.title")}
+        subtitle={data ? t("games.date", { date: data.date }) : t("games.subtitle")}
       />
       {data && !data.provider_configured && (
-        <p className="field__error">
-          Խաղերի տվյալների մատակարարը (API-Football) դեռ կարգավորված չէ — ադմինը պետք է նշի API_FOOTBALL_KEY-ը։
-        </p>
+        <p className="field__error">{t("games.noProvider")}</p>
       )}
-      {data?.provider_error && <p className="field__error">Խաղերի թարմացումը ձախողվեց։ Փորձեք մի փոքր ուշ։</p>}
+      {data?.provider_error && <p className="field__error">{t("games.syncFailed")}</p>}
       <div className="card card--glass">
         <div className="filters">
           <div className="field">
-            <span className="field__label">Ամսաթիվ</span>
+            <span className="field__label">{t("games.fDate")}</span>
             <input type="date" value={filters.date} onChange={(e) => update("date", e.target.value)} />
           </div>
           <div className="field">
-            <span className="field__label">Որոնում</span>
-            <input type="search" value={filters.q} onChange={(e) => update("q", e.target.value)} placeholder="Թիմ կամ լիգա" />
+            <span className="field__label">{t("games.fSearch")}</span>
+            <input type="search" value={filters.q} onChange={(e) => update("q", e.target.value)} placeholder={t("games.fSearchPh")} />
           </div>
           <div className="field">
-            <span className="field__label">Լիգա</span>
+            <span className="field__label">{t("games.fLeague")}</span>
             <select value={filters.league} onChange={(e) => update("league", e.target.value)}>
-              <option value="">Բոլորը</option>
+              <option value="">{t("common.all")}</option>
               {leagues.map((l) => (
                 <option key={l.id} value={String(l.id)}>
                   {l.name} ({l.count})
@@ -76,39 +76,39 @@ export function Games() {
             </select>
           </div>
           <div className="field">
-            <span className="field__label">Կարգավիճակ</span>
+            <span className="field__label">{t("games.fStatus")}</span>
             <select value={filters.status} onChange={(e) => update("status", e.target.value as GameFilters["status"])}>
-              <option value="">Բոլորը</option>
+              <option value="">{t("common.all")}</option>
               <option value="live">Live</option>
-              <option value="upcoming">Առաջիկա</option>
-              <option value="finished">Ավարտված</option>
+              <option value="upcoming">{t("games.upcoming")}</option>
+              <option value="finished">{t("games.finished")}</option>
             </select>
           </div>
           <div className="field">
-            <span className="field__label">Տեսակավորում</span>
+            <span className="field__label">{t("games.fSort")}</span>
             <select value={filters.sort} onChange={(e) => update("sort", e.target.value as GameFilters["sort"])}>
-              <option value="kickoff">Ժամ</option>
-              <option value="form_diff">Ձևի տարբերություն</option>
+              <option value="kickoff">{t("games.sortTime")}</option>
+              <option value="form_diff">{t("games.sortForm")}</option>
             </select>
           </div>
           <div className="field">
-            <span className="field__label">Min win % (տուն)</span>
+            <span className="field__label">{t("games.fMinWin")}</span>
             <input
               type="number"
               min={0}
               max={100}
               value={filters.minHomeWinPct}
               onChange={(e) => update("minHomeWinPct", e.target.value)}
-              placeholder="օր. 50"
+              placeholder={t("games.fMinWinPh")}
             />
           </div>
         </div>
         <div className="filters-toolbar">
           <span className="filters-count">
-            Գտնվել է {data?.count ?? 0}
-            {data && data.form_pending > 0 ? ` · ${data.form_pending} խաղի ձևը դեռ հաշվարկվում է` : ""}
+            {t("games.found", { n: data?.count ?? 0 })}
+            {data && data.form_pending > 0 ? t("games.formPending", { n: data.form_pending }) : ""}
           </span>
-          <button type="button" className="secondary" onClick={resetFilters}>Մաքրել ֆիլտրերը</button>
+          <button type="button" className="secondary" onClick={resetFilters}>{t("games.reset")}</button>
         </div>
         {isFetching && <div className="loading-shimmer" />}
         {isError && <p className="field__error">{error.message}</p>}
@@ -118,12 +118,12 @@ export function Games() {
           ))}
         </div>
         {!isLoading && !isError && games.length === 0 && (
-          <p className="muted">Խաղեր չեն գտնվել — փոխեք ամսաթիվը կամ սեղմեք «Մաքրել ֆիլտրերը»։</p>
+          <p className="muted">{t("games.none")}</p>
         )}
         {data && data.total_pages > 1 && (
           <div className="filters-toolbar" style={{ justifyContent: "center", marginTop: "1rem" }}>
             <button type="button" className="secondary" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>
-              ← Նախորդ
+              {t("common.prev")}
             </button>
             <span className="filters-count">{data.page} / {data.total_pages}</span>
             <button
@@ -132,7 +132,7 @@ export function Games() {
               disabled={page >= data.total_pages}
               onClick={() => setPage((p) => p + 1)}
             >
-              Հաջորդ →
+              {t("common.next")}
             </button>
           </div>
         )}

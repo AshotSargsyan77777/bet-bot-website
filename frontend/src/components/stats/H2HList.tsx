@@ -1,25 +1,27 @@
 import type { H2HMatch } from "../../types/form";
+import { useT } from "../../i18n";
 
 export function H2HList({ matches }: { matches: H2HMatch[] }) {
+  const { t } = useT();
   if (!matches.length) {
     return (
       <div className="card">
-        <h3>Ուղիղ հանդիպումներ</h3>
-        <p className="muted">Տվյալներ չկան</p>
+        <h3>{t("game.h2h")}</h3>
+        <p className="muted">{t("common.noData")}</p>
       </div>
     );
   }
 
   return (
     <div className="card card--interactive">
-      <h3>Ուղիղ հանդիպումներ (H2H)</h3>
+      <h3>{t("game.h2hFull")}</h3>
       <div className="table-wrap">
         <table>
           <thead>
             <tr>
-              <th>Ամսաթիվ</th>
-              <th>Խաղ</th>
-              <th>Հաշիվ</th>
+              <th>{t("game.colDate")}</th>
+              <th>{t("game.colMatch")}</th>
+              <th>{t("game.colScore")}</th>
             </tr>
           </thead>
           <tbody>

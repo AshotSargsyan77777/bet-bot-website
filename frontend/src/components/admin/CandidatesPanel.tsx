@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { api, type Paginated } from "../../api/client";
+import { useT } from "../../i18n";
 
 type Candidate = {
   id: number;
@@ -19,6 +20,7 @@ const empty = { fixture_name: "", market: "MATCH_WINNER", selection: "", odd: ""
 
 export function CandidatesPanel() {
   const qc = useQueryClient();
+  const { t } = useT();
   const [form, setForm] = useState(empty);
   const list = useQuery({
     queryKey: ["admin-candidates"],
@@ -48,7 +50,7 @@ export function CandidatesPanel() {
 
   return (
     <div className="card">
-      <h3>🎯 Կոնստրուկտորի լրացուցիչ ընտրանքներ</h3>
+      <h3>{t("admin.candidates")}</h3>
       <form
         onSubmit={(e) => {
           e.preventDefault();
@@ -57,25 +59,25 @@ export function CandidatesPanel() {
       >
         <div className="filters">
           <div className="field">
-            <span className="field__label">Խաղ</span>
+            <span className="field__label">{t("admin.cMatch")}</span>
             <input value={form.fixture_name} onChange={set("fixture_name")} placeholder="Team A - Team B" required maxLength={255} />
           </div>
           <div className="field">
-            <span className="field__label">Շուկա</span>
+            <span className="field__label">{t("admin.cMarket")}</span>
             <select value={form.market} onChange={set("market")}>
               {MARKETS.map((m) => <option key={m} value={m}>{m}</option>)}
             </select>
           </div>
           <div className="field">
-            <span className="field__label">Ընտրանք</span>
+            <span className="field__label">{t("admin.cSelection")}</span>
             <input value={form.selection} onChange={set("selection")} placeholder="Over 2.5" required maxLength={255} />
           </div>
           <div className="field">
-            <span className="field__label">Գործակից</span>
+            <span className="field__label">{t("admin.cOdd")}</span>
             <input value={form.odd} onChange={set("odd")} inputMode="decimal" placeholder="1.45" required />
           </div>
         </div>
-        <button type="submit" disabled={create.isPending}>Ավելացնել</button>
+        <button type="submit" disabled={create.isPending}>{t("admin.add")}</button>
         {create.isError && <p className="field__error">{create.error.message}</p>}
       </form>
       {(toggle.isError || remove.isError) && <p className="field__error">{(toggle.error ?? remove.error)?.message}</p>}
@@ -86,20 +88,20 @@ export function CandidatesPanel() {
               {c.fixture_name} · {c.market} · {c.selection} @ {Number(c.odd).toFixed(2)}
             </span>
             <button type="button" className="secondary" onClick={() => toggle.mutate(c)}>
-              {c.active ? "Անջատել" : "Միացնել"}
+              {c.active ? t("admin.disable") : t("admin.enable")}
             </button>
             <button
               type="button"
               className="secondary"
               onClick={() => {
-                if (window.confirm("Ջնջե՞լ այս ընտրանքը")) remove.mutate(c.id);
+                if (window.confirm(t("admin.confirmDelete"))) remove.mutate(c.id);
               }}
             >
-              Ջնջել
+              {t("admin.delete")}
             </button>
           </li>
         ))}
-        {list.data && !list.data.results.length && <li className="muted">Լրացուցիչ ընտրանքներ չկան</li>}
+        {list.data && !list.data.results.length && <li className="muted">{t("admin.noCandidates")}</li>}
       </ul>
     </div>
   );

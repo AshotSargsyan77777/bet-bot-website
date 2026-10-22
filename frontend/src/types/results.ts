@@ -30,9 +30,10 @@ export type ResultsStats = {
   by_package: { key: string; label: string; won: number; lost: number }[];
 };
 
-export const resultLabel: Record<string, { text: string; chip: string; icon: string }> = {
-  won: { text: "Անցել է", chip: "chip--win", icon: "✅" },
-  lost: { text: "Չի անցել", chip: "chip--loss", icon: "❌" },
-  void: { text: "Վերադարձ", chip: "chip--draw", icon: "↩️" },
-  pending: { text: "Սպասվում է", chip: "chip--draw", icon: "⏳" },
+/** `key` is the i18n key of the result's name. */
+export const resultLabel: Record<string, { key: "result.won" | "result.lost" | "result.void" | "result.pending"; chip: string; icon: string }> = {
+  won: { key: "result.won", chip: "chip--win", icon: "✅" },
+  lost: { key: "result.lost", chip: "chip--loss", icon: "❌" },
+  void: { key: "result.void", chip: "chip--draw", icon: "↩️" },
+  pending: { key: "result.pending", chip: "chip--draw", icon: "⏳" },
 };

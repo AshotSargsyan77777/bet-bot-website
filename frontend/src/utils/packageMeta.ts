@@ -15,8 +15,13 @@ export const packageMeta: Record<string, { multiplier: string; tier: "standard" 
   pkg_5: { multiplier: "Promo", tier: "promo" },
 };
 
-export const paymentStatusLabel: Record<string, string> = {
-  pending: "⏳ Սպասում է հաստատման",
-  approved: "✅ Հաստատված",
-  rejected: "❌ Մերժված",
-};
+/** i18n keys of payment statuses. */
+export const paymentStatusKey = {
+  pending: "payStatus.pending",
+  approved: "payStatus.approved",
+  rejected: "payStatus.rejected",
+} as const;
+
+export function isPaymentStatus(s: string): s is keyof typeof paymentStatusKey {
+  return s in paymentStatusKey;
+}

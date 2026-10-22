@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { api } from "../../api/client";
+import { useT, usePkgLabel } from "../../i18n";
 import { CheckPreview } from "../stats/CheckPreview";
 
 type AdminCheck = { package_key: string; label: string; ready: boolean; body_text: string; updated_at: string };
@@ -8,6 +9,8 @@ type ChecksPayload = { checks_date: string | null; today: string; checks: AdminC
 
 export function ChecksPanel() {
   const qc = useQueryClient();
+  const { t } = useT();
+  const pkgLabel = usePkgLabel();
   const [selected, setSelected] = useState("");
   const [text, setText] = useState("");
   const checks = useQuery({ queryKey: ["admin-checks"], queryFn: () => api<ChecksPayload>("/api/admin/checks/") });
@@ -25,11 +28,8 @@ export function ChecksPanel() {
 
   return (
     <div className="card">
-      <h3>📝 Չեկեր</h3>
-      <p className="muted">
-        Չեկերի ամսաթիվ՝ {checks.data?.checks_date ?? "—"} · Այսօր՝ {checks.data?.today ?? "—"}. Ձեռքով պահպանված չեկը
-        համարվում է այսօրվանը (ինչպես բոտի /setcheck-ը)։
-      </p>
+      <h3>{t("admin.checks")}</h3>
+      <p className="muted">{t("admin.checksInfo", { date: checks.data?.checks_date ?? "—", today: checks.data?.today ?? "—" })}</p>
       {checks.isError && <p className="field__error">{checks.error.message}</p>}
       <div className="chip-row" style={{ marginBottom: "1rem" }}>
         {checks.data?.checks.map((c) => (
@@ -43,7 +43,7 @@ export function ChecksPanel() {
               save.reset();
             }}
           >
-            {c.ready ? "✅" : "⛔"} {c.label}
+            {c.ready ? "✅" : "⛔"} {pkgLabel(c.package_key, c.label)}
           </button>
         ))}
       </div>
@@ -55,15 +55,15 @@ export function ChecksPanel() {
           }}
         >
           <label>
-            Տեքստ ({current.label})
+            {t("admin.text", { label: pkgLabel(current.package_key, current.label) })}
             <textarea rows={10} value={text} onChange={(e) => setText(e.target.value)} required maxLength={10000} />
           </label>
           {save.isError && <p className="field__error">{save.error.message}</p>}
-          {save.isSuccess && <p>✅ Պահպանվեց</p>}
+          {save.isSuccess && <p>{t("admin.saved")}</p>}
           <button type="submit" style={{ marginTop: "0.75rem" }} disabled={save.isPending || !text.trim()}>
-            Պահպանել
+            {t("admin.save")}
           </button>
-          <h4 style={{ marginTop: "1rem" }}>Նախադիտում</h4>
+          <h4 style={{ marginTop: "1rem" }}>{t("admin.preview")}</h4>
           <CheckPreview text={text} />
         </form>
       )}

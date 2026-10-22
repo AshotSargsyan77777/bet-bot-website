@@ -1,3 +1,6 @@
+import { translate } from "../i18n";
+import { getLang } from "../i18n/lang";
+
 const API_BASE = import.meta.env.VITE_API_URL || "";
 
 const ACCESS_KEY = "access_token";
@@ -86,7 +89,7 @@ type RequestOptions = RequestInit & { json?: unknown; auth?: boolean };
 
 async function request(path: string, options: RequestOptions = {}, retry = true): Promise<Response> {
   const { json, auth = true, ...init } = options;
-  const headers: Record<string, string> = { ...(init.headers as Record<string, string>) };
+  const headers: Record<string, string> = { "Accept-Language": getLang(), ...(init.headers as Record<string, string>) };
   const token = auth ? getToken() : null;
   if (token) headers.Authorization = `Bearer ${token}`;
   let body = init.body;
@@ -99,7 +102,7 @@ async function request(path: string, options: RequestOptions = {}, retry = true)
   try {
     res = await fetch(`${API_BASE}${path}`, { ...init, headers, body });
   } catch {
-    throw new ApiError("Չի հաջողվում միանալ սերվերին։ Ստուգեք ինտերնետ կապը և փորձեք նորից։", 0, "network");
+    throw new ApiError(translate("api.network"), 0, "network");
   }
 
   if (res.status === 401 && token && retry && (await refreshAccessToken())) {
@@ -115,15 +118,15 @@ async function request(path: string, options: RequestOptions = {}, retry = true)
 
 async function toApiError(res: Response): Promise<ApiError> {
   if (res.status === 502 || res.status === 504) {
-    return new ApiError("Սերվերը ժամանակավորապես անհասանելի է։ Փորձեք մի փոքր ուշ։", res.status, "unavailable");
+    return new ApiError(translate("api.unavailable"), res.status, "unavailable");
   }
   const text = await res.text();
   try {
     const data = JSON.parse(text) as { error?: string; detail?: string; code?: string; fields?: Record<string, string[]> };
-    const message = data.error || data.detail || res.statusText || "Սխալ";
+    const message = data.error || data.detail || res.statusText || translate("common.error");
     return new ApiError(String(message), res.status, data.code, data.fields);
   } catch {
-    return new ApiError(res.status >= 500 ? "Սերվերի ներքին սխալ" : res.statusText || "Սխալ", res.status);
+    return new ApiError(res.status >= 500 ? translate("api.server") : res.statusText || translate("common.error"), res.status);
   }
 }
 
@@ -139,6 +142,6 @@ export async function apiBlobUrl(path: string): Promise<string> {
   return URL.createObjectURL(await res.blob());
 }
 
-export function errorMessage(err: unknown, fallback = "Սխալ"): string {
-  return err instanceof Error && err.message ? err.message : fallback;
+export function errorMessage(err: unknown, fallback?: string): string {
+  return err instanceof Error && err.message ? err.message : fallback ?? translate("common.error");
 }

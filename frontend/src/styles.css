@@ -288,6 +288,17 @@ a:hover {
   transition: transform 0.2s, box-shadow 0.2s;
 }
 
+select.lang-switch {
+  width: auto;
+  margin-top: 0;
+  flex-shrink: 0;
+  padding: 0.3rem 0.45rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
 .site-nav__cta:hover {
   transform: translateY(-2px);
   box-shadow: 0 6px 20px rgba(99, 102, 241, 0.35);
