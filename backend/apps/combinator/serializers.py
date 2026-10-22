@@ -1,5 +1,6 @@
 from rest_framework import serializers
 
+from apps.checks.constants import COMBO_TIERS
 from apps.combinator.models import ComboOrder
 
 MARKETS = [
@@ -24,20 +25,14 @@ MARKETS = [
 
 
 class ComboSearchSerializer(serializers.Serializer):
-    """VIP combinator search: total odds range and the maximum number of games."""
+    """VIP combinator: a paid tier (fixed total odds range) and the maximum number of games."""
 
-    target_odds_min = serializers.FloatField(min_value=1.5, max_value=21)
-    target_odds_max = serializers.FloatField(min_value=1.5, max_value=21)
+    tier = serializers.ChoiceField(choices=list(COMBO_TIERS))
     max_legs = serializers.IntegerField(min_value=2, max_value=12, default=7)
-
-    def validate(self, attrs):
-        if attrs["target_odds_min"] > attrs["target_odds_max"]:
-            raise serializers.ValidationError("Ընդհանուր գործակցի «սկսած»-ը չի կարող մեծ լինել «մինչև»-ից")
-        return attrs
 
 
 class ComboOrderCreateSerializer(serializers.Serializer):
-    token = serializers.CharField(max_length=4000)
+    tier = serializers.ChoiceField(choices=list(COMBO_TIERS))
     receipt = serializers.ImageField()
 
     def validate_receipt(self, value):
@@ -48,23 +43,12 @@ class ComboOrderCreateSerializer(serializers.Serializer):
 
 class ComboOrderSerializer(serializers.ModelSerializer):
     label = serializers.CharField(read_only=True)
-    legs = serializers.SerializerMethodField()
     body_text = serializers.SerializerMethodField()
-    legs_count = serializers.SerializerMethodField()
 
     class Meta:
         model = ComboOrder
-        fields = ("id", "tier", "label", "price", "combined_odds", "hit_chance", "legs_count", "legs", "body_text",
-                  "status", "created_at", "paid_at")
-
-    def _paid(self, obj):
-        return obj.status == obj.STATUS_PAID
-
-    def get_legs(self, obj):
-        return obj.legs if self._paid(obj) else []  # picks stay hidden until the payment is approved
+        fields = ("id", "tier", "label", "price", "valid_date", "body_text", "status", "created_at", "paid_at")
 
     def get_body_text(self, obj):
-        return obj.body_text if self._paid(obj) else ""
-
-    def get_legs_count(self, obj):
-        return len(obj.legs)
+        # only single-variant orders made before tier purchases carry their own text
+        return obj.body_text if obj.status == obj.STATUS_PAID else ""

@@ -1,7 +1,6 @@
 import logging
 
 from django.conf import settings
-from django.core import signing
 from django.db import transaction
 from django.utils import timezone
 from rest_framework import generics, status
@@ -11,25 +10,28 @@ from rest_framework.throttling import SimpleRateThrottle
 from rest_framework.views import APIView
 
 from apps.accounts.permissions import IsVipMember
-from apps.checks.constants import COMBO_TIERS, combo_tier_for
+from apps.accounts.permissions import user_is_admin
+from apps.checks.constants import COMBO_TIERS
 from apps.checks.models import AppSettings, DailyCheck
 from apps.checks.services.checks_logic import check_is_ready
 from apps.checks.services.formatting import format_package
 from apps.checks.services.time import yerevan_today
 from apps.combinator.models import ComboOrder
 from apps.combinator.pool import todays_selections
-from apps.combinator.search import build_candidate_pool, hit_chance, search_combinations
-from apps.combinator.serializers import ComboOrderCreateSerializer, ComboOrderSerializer, ComboSearchSerializer
+from apps.combinator.search import build_candidate_pool, search_combinations
+from apps.combinator.serializers import (
+    ComboOrderCreateSerializer,
+    ComboOrderSerializer,
+    ComboSearchSerializer,
+)
 from apps.commerce.models import Payment, SelectionCandidate
 from apps.games.models import FixtureCache
 
 logger = logging.getLogger(__name__)
 
 MAX_POOL = 120
-MAX_OFFERS = 6
+MAX_OFFERS = 10
 LEG_ODDS_MIN, LEG_ODDS_MAX = 1.1, 3.0  # single pick odds used by the combinator
-TOKEN_SALT = "combinator-offer"
-TOKEN_MAX_AGE = 6 * 3600
 
 
 class CombinatorThrottle(SimpleRateThrottle):
@@ -75,26 +77,45 @@ def _drop_started(pool: list[dict]) -> list[dict]:
     return [c for c in pool if str(c.get("fixture_id") or "") not in started]
 
 
+def tier_access(user, today: str) -> tuple[set[str], set[str]]:
+    """(unlocked, pending) tiers for today. Admins have every tier for free."""
+    if user_is_admin(user):
+        return set(COMBO_TIERS), set()
+    rows = ComboOrder.objects.filter(user=user, valid_date=today).exclude(status=ComboOrder.STATUS_REJECTED)
+    unlocked = {o.tier for o in rows if o.status == ComboOrder.STATUS_PAID}
+    pending = {o.tier for o in rows if o.status == ComboOrder.STATUS_PENDING} - unlocked
+    return unlocked, pending
+
+
+def _tiers_payload() -> list[dict]:
+    return [
+        {"key": k, "label": t["label"], "price": t["price"], "min": t["min"], "max": t["max"]}
+        for k, t in COMBO_TIERS.items()
+    ]
+
+
 class CombinatorPoolView(APIView):
-    """How many picks are available today and the paid combination tiers (picks themselves are not exposed)."""
+    """How many picks are available today, the paid tiers and which of them this user has unlocked."""
 
     permission_classes = (IsVipMember,)
 
     def get(self, request):
         pool = current_pool()
-        tiers = [
-            {"key": k, "label": t["label"], "price": t["price"], "min": t["min"], "max": t["max"], "upto": t["upto"]}
-            for k, t in COMBO_TIERS.items()
-        ]
-        return Response({"count": len(pool), "tiers": tiers, "card_number": settings.CARD_NUMBER})
-
-
-def _leg_key(leg: dict) -> list:
-    return [leg.get("fixture_name") or "", leg.get("market") or "", leg.get("selection") or ""]
+        unlocked, pending = tier_access(request.user, yerevan_today())
+        return Response(
+            {
+                "count": len(pool),
+                "tiers": _tiers_payload(),
+                "unlocked": sorted(unlocked),
+                "pending": sorted(pending),
+                "is_admin": user_is_admin(request.user),
+                "card_number": settings.CARD_NUMBER,
+            }
+        )
 
 
 class CombinatorSearchView(APIView):
-    """Finds combinations; returns only odds/size/chance/price plus a signed token to buy one."""
+    """Today's variants for a tier. Picks are shown only once the tier is paid for today (or to admins)."""
 
     permission_classes = (IsVipMember,)
     throttle_classes = (CombinatorThrottle,)
@@ -103,50 +124,65 @@ class CombinatorSearchView(APIView):
         serializer = ComboSearchSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         params = serializer.validated_data
+        tier_key = params["tier"]
+        tier = COMBO_TIERS[tier_key]
         pool = current_pool()
         if len(pool) > MAX_POOL:
             return Response(
                 {"error": "too many candidates; narrow filters or wait for smaller pool", "code": "pool_too_large"},
                 status=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
             )
-        tier = combo_tier_for(params["target_odds_max"])
         result = search_combinations(
             pool,
-            target_min=params["target_odds_min"],
-            target_max=params["target_odds_max"],
+            target_min=tier["min"],
+            target_max=tier["max"],
             legs_min=2,
             legs_max=params["max_legs"],
             leg_odds_min=LEG_ODDS_MIN,
             leg_odds_max=LEG_ODDS_MAX,
             max_results=MAX_OFFERS,
         )
-        offers = []
+        unlocked, pending = tier_access(request.user, yerevan_today())
+        is_open = tier_key in unlocked
+        variants = []
         for combo in result["results"]:
-            token = signing.dumps(
-                {
-                    "u": request.user.pk,
-                    "min": params["target_odds_min"],
-                    "max": params["target_odds_max"],
-                    "legs": [_leg_key(leg) for leg in combo["legs"]],
-                },
-                salt=TOKEN_SALT,
-                compress=True,
-            )
-            offers.append(
-                {
-                    "token": token,
-                    "combined_odds": combo["combined_odds"],
-                    "legs_count": combo["legs_count"],
-                    "hit_chance": combo["hit_chance"],
-                    "tier": tier,
-                    "price": COMBO_TIERS[tier]["price"],
-                }
-            )
-        return Response({"results": offers, "pool_size": len(pool), "timed_out": result["timed_out"]})
+            item = {
+                "combined_odds": combo["combined_odds"],
+                "legs_count": combo["legs_count"],
+                "hit_chance": combo["hit_chance"],
+            }
+            if is_open:
+                selections = [_selection(leg) for leg in combo["legs"]]
+                item["legs"] = selections
+                item["body_text"] = format_package({"combined_odds": combo["combined_odds"], "selections": selections})
+            variants.append(item)
+        return Response(
+            {
+                "tier": tier_key,
+                "price": tier["price"],
+                "unlocked": is_open,
+                "pending": tier_key in pending,
+                "results": variants,
+                "pool_size": len(pool),
+                "timed_out": result["timed_out"],
+            }
+        )
+
+
+def _selection(leg: dict) -> dict:
+    return {
+        "fixture": leg["fixture_name"],
+        "fixture_id": leg.get("fixture_id"),
+        "market": leg["market"],
+        "selection": leg["selection"],
+        "odd": leg["odd"],
+        "probability": leg.get("probability"),
+        "reasons": leg.get("reasons") or [],
+    }
 
 
 class ComboOrderListCreateView(generics.ListAPIView):
-    """GET: my combinator orders (legs visible once paid) · POST: buy a found combination with a receipt."""
+    """GET: my combinator purchases · POST: pay for a tier; once approved, all of today's variants open."""
 
     permission_classes = (IsVipMember,)
     serializer_class = ComboOrderSerializer
@@ -158,48 +194,21 @@ class ComboOrderListCreateView(generics.ListAPIView):
     def post(self, request):
         serializer = ComboOrderCreateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        try:
-            data = signing.loads(serializer.validated_data["token"], salt=TOKEN_SALT, max_age=TOKEN_MAX_AGE)
-        except signing.BadSignature:
-            return Response(
-                {"error": "Տարբերակի ժամկետը անցել է, որոնեք նորից", "code": "expired"}, status=status.HTTP_400_BAD_REQUEST
-            )
-        if data.get("u") != request.user.pk:
-            return Response({"error": "Սխալ տարբերակ", "code": "invalid"}, status=status.HTTP_400_BAD_REQUEST)
-
-        # Rebuild the legs from today's pool: odds come from the server, never from the client.
-        by_key = {tuple(_leg_key(item)): item for item in current_pool()}
-        legs = [by_key.get(tuple(k)) for k in data["legs"]]
-        if not legs or any(leg is None for leg in legs):
-            return Response(
-                {"error": "Ընտրանքները արդեն փոխվել են, որոնեք նորից", "code": "stale"}, status=status.HTTP_409_CONFLICT
-            )
-        product = 1.0
-        for leg in legs:
-            product *= leg["odd"]
-        if not (data["min"] - 0.01 <= product <= data["max"] + 0.01):
-            return Response(
-                {"error": "Գործակիցները փոխվել են, որոնեք նորից", "code": "stale"}, status=status.HTTP_409_CONFLICT
-            )
-        tier = combo_tier_for(data["max"])
-        price = COMBO_TIERS[tier]["price"]
-        chance = hit_chance(legs)
-        selections = [
-            {"fixture": leg["fixture_name"], "fixture_id": leg.get("fixture_id"), "market": leg["market"],
-             "selection": leg["selection"], "odd": leg["odd"], "probability": leg.get("probability"),
-             "reasons": leg.get("reasons") or []}
-            for leg in legs
-        ]
+        tier = serializer.validated_data["tier"]
+        today = yerevan_today()
+        if user_is_admin(request.user):
+            return Response({"error": "Ադմինի համար անվճար է", "code": "free_for_admin"}, status=status.HTTP_400_BAD_REQUEST)
         with transaction.atomic():
-            order = ComboOrder.objects.create(
-                user=request.user,
-                tier=tier,
-                price=price,
-                combined_odds=round(product, 2),
-                hit_chance=chance,
-                legs=selections,
-                body_text=format_package({"combined_odds": product, "selections": selections}),
-            )
+            # serialize concurrent purchases of the same user
+            type(request.user).objects.select_for_update().filter(pk=request.user.pk).first()
+            unlocked, pending = tier_access(request.user, today)
+            if tier in unlocked or tier in pending:
+                return Response(
+                    {"error": "Այս մակարդակը այսօր արդեն գնված է կամ սպասում է հաստատման", "code": "duplicate"},
+                    status=status.HTTP_409_CONFLICT,
+                )
+            price = COMBO_TIERS[tier]["price"]
+            order = ComboOrder.objects.create(user=request.user, tier=tier, price=price, valid_date=today)
             Payment.objects.create(
                 user=request.user,
                 package_key=tier,

@@ -50,12 +50,22 @@ export function Checks() {
         )}
         {user && mine.isLoading && <div className="loading-shimmer" />}
         {user && mine.isError && <p className="field__error">{mine.error.message}</p>}
-        {user && mine.data && !mine.data.active && (
+        {mine.data?.is_admin && !mine.data.checks?.length && <p className="muted">Այսօրվա չեկերը դեռ պատրաստ չեն։</p>}
+        {mine.data?.is_admin &&
+          mine.data.checks?.map((c) => (
+            <div key={c.package_key} style={{ marginBottom: "1rem" }}>
+              <p>
+                <strong>{c.label}</strong> <span className="chip">Ադմին՝ անվճար</span>
+              </p>
+              <CheckPreview text={c.text} />
+            </div>
+          ))}
+        {user && mine.data && !mine.data.is_admin && !mine.data.active && (
           <p className="muted">
             Ակտիվ չեկ չունեք։ Ընտրեք փաթեթ ներքևում կամ <Link to="/promo">մուտքագրեք պրոմոկոդ</Link>։
           </p>
         )}
-        {mine.data?.active && mine.data.text && <CheckPreview text={`${mine.data.text}\n\n${data.disclaimer}`} />}
+        {mine.data?.active && !mine.data.is_admin && mine.data.text && <CheckPreview text={`${mine.data.text}\n\n${data.disclaimer}`} />}
       </div>
       <div className="grid">
         {packages.map((p) => {
