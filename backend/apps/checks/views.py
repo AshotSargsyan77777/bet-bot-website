@@ -7,8 +7,8 @@ from rest_framework import generics, permissions, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from apps.accounts.permissions import IsAdminUser
-from apps.checks.constants import N8N_KEYS
+from apps.accounts.permissions import IsAdminUser, user_is_admin
+from apps.checks.constants import N8N_KEYS, PACKAGES
 from apps.checks.models import AppSettings, CheckRecord, DailyCheck
 from apps.checks.serializers import (
     AdminCheckUpdateSerializer,
@@ -76,6 +76,20 @@ class PublicSummaryView(APIView):
 
 class MyCheckView(APIView):
     def get(self, request):
+        if user_is_admin(request.user):
+            # admins see every ready check for free
+            ready = set(ready_package_keys())
+            checks = [c for c in DailyCheck.objects.order_by("id") if c.package_key in ready]
+            return Response(
+                {
+                    "active": bool(checks),
+                    "is_admin": True,
+                    "checks": [
+                        {"package_key": c.package_key, "label": PACKAGES[c.package_key]["label"], "text": c.body_text}
+                        for c in checks
+                    ],
+                }
+            )
         sub = get_active_subscription(request.user)
         if not sub:
             return Response({"active": False})

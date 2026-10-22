@@ -15,7 +15,7 @@ from rest_framework.response import Response
 from rest_framework.throttling import ScopedRateThrottle
 from rest_framework.views import APIView
 
-from apps.accounts.permissions import IsAdminUser
+from apps.accounts.permissions import IsAdminUser, user_is_admin
 from apps.checks.constants import PACKAGES, product_label
 from apps.checks.models import AppSettings
 from apps.checks.services.checks_logic import ready_package_keys
@@ -94,7 +94,10 @@ class VipStatusView(APIView):
     permission_classes = (permissions.AllowAny,)
 
     def get(self, request):
-        is_vip = request.user.is_authenticated and VipMember.objects.filter(user=request.user).exists()
+        # admins get everything for free, VIP included
+        is_vip = user_is_admin(request.user) or (
+            request.user.is_authenticated and VipMember.objects.filter(user=request.user).exists()
+        )
         return Response(
             {
                 "is_vip": is_vip,
@@ -109,7 +112,7 @@ class StatusView(APIView):
     def get(self, request):
         sub = get_active_subscription(request.user)
         pkg = PACKAGES.get(sub.package_key) if sub else None
-        vip = VipMember.objects.filter(user=request.user).exists()
+        vip = user_is_admin(request.user) or VipMember.objects.filter(user=request.user).exists()
         pending = Payment.objects.filter(user=request.user, status=Payment.STATUS_PENDING).first()
         return Response(
             {

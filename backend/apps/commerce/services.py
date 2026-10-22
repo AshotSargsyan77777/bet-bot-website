@@ -2,7 +2,7 @@ from django.conf import settings
 from django.db import transaction
 from django.utils import timezone
 
-from apps.accounts.telegram import notify_user
+from apps.accounts.telegram import notify_user, site_url
 from apps.checks.constants import COMBO_TIERS, PROMO_PACKAGES, product_label
 from apps.checks.models import DailyCheck
 from apps.checks.services.checks_logic import check_is_ready, get_check_display_text
@@ -64,8 +64,20 @@ def approve_payment(payment_id: int, reviewer=None) -> Payment:
         order = payment.combo_order
         order.status = order.STATUS_PAID
         order.paid_at = timezone.now()
-        order.save(update_fields=["status", "paid_at"])
-        notify_user(payment.user, f"✅ Վճարումը հաստատվեց՝ {label}\n\n{order.body_text}")
+        update = ["status", "paid_at"]
+        if not order.legs:
+            # tier purchase: opens all variants of the day it is approved on
+            order.valid_date = yerevan_today()
+            update.append("valid_date")
+        order.save(update_fields=update)
+        if order.body_text:
+            text = f"✅ Վճարումը հաստատվեց՝ {label}\n\n{order.body_text}"
+        else:
+            link = site_url("/combinator")
+            text = f"✅ Վճարումը հաստատվեց՝ {label}\nԱյսօրվա բոլոր տարբերակները բացված են կայքում․ ընտրեք ցանկացածը։" + (
+                f"\n👉 {link}" if link else ""
+            )
+        notify_user(payment.user, text)
     elif pkg_key == "pkg_vip":
         VipMember.objects.get_or_create(user=payment.user)
         link = settings.VIP_CHANNEL_LINK

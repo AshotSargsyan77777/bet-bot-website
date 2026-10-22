@@ -68,25 +68,29 @@ class CombinatorFlowTests(APITestCase):
         app.save()
         SelectionCandidate.objects.create(fixture_name="E - F", market="BTTS", selection="Yes", odd=1.6)
 
-    def search(self, lo=4.8, hi=5.3, max_legs=7):
-        return self.client.post("/api/combinator/search/", {"target_odds_min": lo, "target_odds_max": hi, "max_legs": max_legs}, format="json")
+    def search(self, tier="combo_x5", max_legs=7):
+        return self.client.post("/api/combinator/search/", {"tier": tier, "max_legs": max_legs}, format="json")
+
+    def buy(self, tier="combo_x5"):
+        return self.client.post("/api/combinator/orders/", {"tier": tier, "receipt": receipt()}, format="multipart")
 
     def test_pool_hides_picks(self):
         r = self.client.get("/api/combinator/pool/")
         self.assertEqual(r.data["count"], 4)
         self.assertNotIn("candidates", r.data)
         self.assertEqual([t["price"] for t in r.data["tiers"]], [3000, 5000, 6000, 8000])
+        self.assertEqual((r.data["unlocked"], r.data["pending"]), ([], []))
 
-    def test_search_returns_masked_offers_with_price(self):
+    def test_unpaid_search_shows_masked_variants(self):
         r = self.search()
         self.assertEqual(r.status_code, 200, r.data)
+        self.assertEqual((r.data["tier"], r.data["price"], r.data["unlocked"]), ("combo_x5", 3000, False))
         offer = r.data["results"][0]
-        self.assertEqual((offer["tier"], offer["price"]), ("combo_x5", 3000))
         self.assertNotIn("legs", offer)
+        self.assertNotIn("body_text", offer)
         self.assertTrue(4.8 <= offer["combined_odds"] <= 5.3)
-        self.assertEqual(self.search(9.5, 10.5).data["results"], [])  # not reachable with this pool
-        for bad in ({"target_odds_min": 6, "target_odds_max": 5}, {"target_odds_min": 2, "target_odds_max": 30},
-                    {"target_odds_min": 2, "target_odds_max": 5, "max_legs": 1}):
+        self.assertEqual(self.search("combo_x10").data["results"], [])  # not reachable with this pool
+        for bad in ({"tier": "combo_x7"}, {"tier": "combo_x5", "max_legs": 1}):
             self.assertEqual(self.client.post("/api/combinator/search/", bad, format="json").status_code, 400, bad)
 
     def test_non_vip_forbidden(self):
@@ -95,16 +99,18 @@ class CombinatorFlowTests(APITestCase):
         self.assertEqual(self.search().status_code, 403)
         self.assertEqual(self.client.get("/api/combinator/orders/").status_code, 403)
 
-    def test_buy_approve_unlocks_legs(self):
-        offer = self.search().data["results"][0]
+    def test_paying_for_a_tier_opens_all_its_variants(self):
         # a pending package payment must survive a combinator purchase
         Payment.objects.create(user=self.user, package_key="pkg_vip", receipt="x.png", amount=5000)
-        r = self.client.post("/api/combinator/orders/", {"token": offer["token"], "receipt": receipt()}, format="multipart")
+        r = self.buy()
         self.assertEqual(r.status_code, 201, r.data)
-        self.assertEqual((r.data["legs"], r.data["body_text"], r.data["status"]), ([], "", "pending"))
+        self.assertEqual((r.data["body_text"], r.data["status"], r.data["valid_date"]), ("", "pending", yerevan_today()))
+        self.assertEqual(self.buy().status_code, 409)  # same tier twice a day
         self.assertEqual(Payment.objects.filter(user=self.user, status="pending").count(), 2)
         pay = Payment.objects.get(package_key="combo_x5")
         self.assertEqual(pay.amount, 3000)
+        self.assertEqual(self.client.get("/api/combinator/pool/").data["pending"], ["combo_x5"])
+        self.assertFalse(self.search().data["unlocked"])
 
         admin = User.objects.create_user("a", "a@example.com", "x", is_staff=True)
         self.client.force_authenticate(admin)
@@ -112,36 +118,38 @@ class CombinatorFlowTests(APITestCase):
         self.assertTrue(any("Կոնստրուկտոր x5" in p["package_label"] for p in lst))
         with mock.patch("apps.commerce.services.notify_user") as notify:
             self.assertEqual(self.client.post("/api/admin/payments/", {"payment_id": pay.id, "action": "approve"}, format="json").status_code, 200)
-        self.assertIn("GOALKING", notify.call_args.args[1])
+        self.assertIn("տարբերակները բացված են", notify.call_args.args[1])
 
         self.client.force_authenticate(self.user)
-        order = self.client.get("/api/combinator/orders/").data["results"][0]
-        self.assertEqual(order["status"], "paid")
-        self.assertEqual(len(order["legs"]), order["legs_count"])
-        self.assertIn("GOALKING", order["body_text"])
+        self.assertEqual(self.client.get("/api/combinator/pool/").data["unlocked"], ["combo_x5"])
+        r = self.search()
+        self.assertTrue(r.data["unlocked"])
+        self.assertGreaterEqual(len(r.data["results"]), 1)
+        for v in r.data["results"]:
+            self.assertEqual(len(v["legs"]), v["legs_count"])
+            self.assertIn("GOALKING", v["body_text"])
+        self.assertFalse(self.search("combo_x10").data["unlocked"])  # other tiers stay locked
+        self.assertEqual(self.client.get("/api/combinator/orders/").data["results"][0]["status"], "paid")
 
-    def test_reject_and_token_checks(self):
-        offer = self.search().data["results"][0]
-        self.assertEqual(self.client.post("/api/combinator/orders/", {"token": offer["token"] + "x", "receipt": receipt()}, format="multipart").status_code, 400)
-        other = User.objects.create_user("o", "o@example.com", "x")
-        VipMember.objects.create(user=other)
-        self.client.force_authenticate(other)
-        self.assertEqual(self.client.post("/api/combinator/orders/", {"token": offer["token"], "receipt": receipt()}, format="multipart").status_code, 400)
-        self.client.force_authenticate(self.user)
-        # picks changed after the search → stale
-        DailyCheck.objects.filter(package_key="standard_3x").update(selections_json=[])
-        SelectionCandidate.objects.all().delete()
-        self.assertEqual(self.client.post("/api/combinator/orders/", {"token": offer["token"], "receipt": receipt()}, format="multipart").status_code, 409)
-        self.assertFalse(ComboOrder.objects.exists())
+    def test_admin_gets_everything_free(self):
+        admin = User.objects.create_user("boss", "boss@example.com", "x", is_staff=True)
+        self.client.force_authenticate(admin)
+        self.assertEqual(self.client.get("/api/combinator/pool/").data["unlocked"], ["combo_x10", "combo_x15", "combo_x20", "combo_x5"])
+        self.assertIn("legs", self.search().data["results"][0])
+        self.assertEqual(self.buy().status_code, 400)
+        self.assertTrue(self.client.get("/api/vip/status/").data["is_vip"])
+        mine = self.client.get("/api/checks/mine/").data
+        self.assertEqual([c["package_key"] for c in mine["checks"]], ["standard_3x"])
 
-    def test_rejected_payment_rejects_order(self):
-        offer = self.search().data["results"][0]
-        self.client.post("/api/combinator/orders/", {"token": offer["token"], "receipt": receipt()}, format="multipart")
+    def test_rejected_payment_rejects_order_and_allows_retry(self):
+        self.buy()
         pay = Payment.objects.get(package_key="combo_x5")
         admin = User.objects.create_user("a2", "a2@example.com", "x", is_staff=True)
         self.client.force_authenticate(admin)
         self.client.post("/api/admin/payments/", {"payment_id": pay.id, "action": "reject"}, format="json")
         self.assertEqual(ComboOrder.objects.get().status, "rejected")
+        self.client.force_authenticate(self.user)
+        self.assertEqual(self.buy().status_code, 201)
 
 
 @override_settings(N8N_INTERNAL_KEY="k", PROMOS_PER_UPDATE=0, TELEGRAM_BOT_TOKEN="")
@@ -181,9 +189,8 @@ class N8nCombinatorPoolTests(APITestCase):
         )
         self.assertEqual(self.client.get("/api/combinator/pool/").data["count"], 2)
 
-        r = self.client.post("/api/combinator/search/", {"target_odds_min": 2.9, "target_odds_max": 3.1, "max_legs": 3}, format="json")
+        r = self.client.post("/api/combinator/search/", {"tier": "combo_x5", "max_legs": 3}, format="json")
         self.assertEqual(r.status_code, 200, r.data)
-        self.assertEqual(r.data["results"][0]["combined_odds"], 3.0)
 
     def test_invalid_payload(self):
         r = self.client.post(

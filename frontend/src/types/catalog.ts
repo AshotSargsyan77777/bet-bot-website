@@ -21,4 +21,6 @@ export type MyCheck = {
   package_key?: string;
   valid_date?: string;
   from_promo?: boolean;
+  is_admin?: boolean;
+  checks?: { package_key: string; label: string; text: string }[];
 };
