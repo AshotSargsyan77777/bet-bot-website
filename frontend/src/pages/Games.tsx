@@ -1,5 +1,6 @@
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { api } from "../api/client";
 import { GameCard } from "../components/GameCard";
 import { PageHeader } from "../components/PageHeader";
@@ -12,7 +13,9 @@ const PAGE_SIZE = 24;
 
 export function Games() {
   const { t } = useT();
-  const [filters, setFilters] = useState<GameFilters>(emptyGameFilters);
+  const [search] = useSearchParams();
+  // /games?analysis=1 (home page, footer, old /analysis link) opens the list of matches with an analysis
+  const [filters, setFilters] = useState<GameFilters>(() => ({ ...emptyGameFilters, analysis: search.get("analysis") === "1" }));
   const [page, setPage] = useState(1);
 
   const debouncedQ = useDebouncedValue(filters.q, 300);
@@ -89,6 +92,13 @@ export function Games() {
             <select value={filters.sort} onChange={(e) => update("sort", e.target.value as GameFilters["sort"])}>
               <option value="kickoff">{t("games.sortTime")}</option>
               <option value="form_diff">{t("games.sortForm")}</option>
+            </select>
+          </div>
+          <div className="field">
+            <span className="field__label">{t("nav.analysis")}</span>
+            <select value={filters.analysis ? "1" : ""} onChange={(e) => update("analysis", e.target.value === "1")}>
+              <option value="">{t("common.all")}</option>
+              <option value="1">{t("games.analysisOnly")}</option>
             </select>
           </div>
           <div className="field">

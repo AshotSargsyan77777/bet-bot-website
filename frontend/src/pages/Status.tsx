@@ -160,6 +160,11 @@ export function Status() {
     queryFn: () => api<MyCheck>("/api/checks/mine/"),
     enabled: !!user,
   });
+  const analyses = useQuery({
+    queryKey: ["analyses-mine"],
+    queryFn: () => api<{ results: { id: number; fixture_id: number; home: string; away: string; date: string; status: string }[] }>("/api/analysis/mine/"),
+    enabled: !!user,
+  });
   const payments = useQuery({
     queryKey: ["payments", page],
     queryFn: () => api<Paginated<PaymentRow>>(`/api/payments/?page=${page}&page_size=10`),
@@ -213,6 +218,19 @@ export function Status() {
             </div>
           )}
         </div>
+        {!!analyses.data?.results.length && (
+          <div className="card card--interactive">
+            <h3>{t("status.analyses")}</h3>
+            <ul className="match-list">
+              {analyses.data.results.map((m, i) => (
+                <li key={`${m.id}-${i}`}>
+                  <Link to={`/games/${m.fixture_id}`}>{m.home} — {m.away}</Link> · {m.date} ·{" "}
+                  {t(m.status === "paid" ? "payStatus.paid" : m.status === "pending" ? "payStatus.pending" : "payStatus.rejected")}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
         <ProfileCard />
         <TelegramCard />
       </div>

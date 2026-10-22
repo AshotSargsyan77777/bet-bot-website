@@ -87,7 +87,7 @@ def approve_payment(payment_id: int, reviewer=None) -> Payment:
         order.status = order.STATUS_PAID
         order.paid_at = timezone.now()
         order.save(update_fields=["status", "paid_at"])
-        link = site_url(f"/analysis/{order.analysis_id}")
+        link = site_url(f"/games/{order.analysis.fixture_id}")
         notify_user(
             payment.user,
             f"✅ Վճարումը հաստատվեց՝ {label}\n⚽ {order.analysis.home} - {order.analysis.away}"

@@ -116,3 +116,24 @@ class MatchAnalysisTests(APITestCase):
         r = self.client.post(f"/api/analysis/{a.id}/buy/", {"receipt": receipt()}, format="multipart")
         self.assertEqual(r.status_code, 400)
         self.assertEqual(MatchAnalysis.objects.get().date, yerevan_today())
+
+
+@override_settings(N8N_INTERNAL_KEY="k", PROMOS_PER_UPDATE=0, TELEGRAM_BOT_TOKEN="", API_FOOTBALL_KEY="")
+class GamesIntegrationTests(APITestCase):
+    def test_games_list_shows_logos_and_analysis(self):
+        day = yerevan_today()
+        kick = timezone.make_aware(timezone.datetime.fromisoformat(f"{day}T20:00:00"))
+        for fid, league in ((1, 140), (2, 39)):
+            FixtureCache.objects.create(api_fixture_id=fid, league_id=league, home_team_id=529, away_team_id=541,
+                                        home_team_name=f"H{fid}", away_team_name=f"A{fid}", kickoff=kick)
+        self.client.post("/api/internal/packages/", {"packages": [], "match_analyses": [item(1)]}, format="json",
+                         HTTP_X_INTERNAL_KEY="k")
+        rows = {g["id"]: g for g in self.client.get(f"/api/games/?date={day}").data["results"]}
+        self.assertEqual(rows[1]["home_logo"], "https://media.api-sports.io/football/teams/529.png")
+        self.assertEqual(rows[1]["league_logo"], "https://media.api-sports.io/football/leagues/140.png")
+        self.assertEqual((rows[1]["analysis"]["access"], rows[1]["analysis"]["price"]), ("locked", 1000))
+        self.assertIsNone(rows[2]["analysis"])
+        only = self.client.get(f"/api/games/?date={day}&analysis=true").data["results"]
+        self.assertEqual([g["id"] for g in only], [1])
+        detail = self.client.get("/api/games/1/").data
+        self.assertEqual((detail["analysis"]["access"], detail["away_logo"][-7:]), ("locked", "541.png"))

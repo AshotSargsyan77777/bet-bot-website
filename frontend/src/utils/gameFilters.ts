@@ -5,6 +5,7 @@ export type GameFilters = {
   sort: "kickoff" | "form_diff";
   minHomeWinPct: string;
   league: string;
+  analysis: boolean;
 };
 
 export const emptyGameFilters: GameFilters = {
@@ -14,6 +15,7 @@ export const emptyGameFilters: GameFilters = {
   sort: "kickoff",
   minHomeWinPct: "",
   league: "",
+  analysis: false,
 };
 
 /** Filters are applied server-side (/api/games/), this only builds the query string. */
@@ -23,6 +25,7 @@ export function gameQueryParams(f: GameFilters, page: number, pageSize: number):
   if (f.q.trim()) params.set("q", f.q.trim());
   if (f.status) params.set("status", f.status);
   if (f.league) params.set("league", f.league);
+  if (f.analysis) params.set("analysis", "true");
   if (f.sort !== "kickoff") params.set("sort", f.sort);
   const minWin = Number(f.minHomeWinPct);
   if (f.minHomeWinPct.trim() !== "" && Number.isFinite(minWin)) {

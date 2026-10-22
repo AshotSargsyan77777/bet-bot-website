@@ -52,6 +52,15 @@ def _kickoffs(analyses) -> dict[int, object]:
     return dict(FixtureCache.objects.filter(api_fixture_id__in=ids).values_list("api_fixture_id", "kickoff"))
 
 
+def analysis_info(user, fixture_ids) -> dict[int, dict]:
+    """fixture id → {id, access, price} for matches that have an analysis (the latest one per match)."""
+    latest: dict[int, MatchAnalysis] = {}
+    for a in MatchAnalysis.objects.filter(fixture_id__in=list(fixture_ids)).order_by("date", "id"):
+        latest[a.fixture_id] = a
+    access = _access(user, list(latest.values()))
+    return {fid: {"id": a.id, "access": access.get(a.id, "locked"), "price": PRICE} for fid, a in latest.items()}
+
+
 def _summary(a: MatchAnalysis, kickoff, access: str | None) -> dict:
     return {
         "id": a.id,
@@ -91,6 +100,7 @@ class MyAnalysesView(APIView):
                 "results": [
                     {
                         "id": o.analysis_id,
+                        "fixture_id": o.analysis.fixture_id,
                         "home": o.analysis.home,
                         "away": o.analysis.away,
                         "date": o.analysis.date,

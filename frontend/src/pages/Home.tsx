@@ -168,6 +168,12 @@ export function Home() {
       </section>
 
       <section className="section">
+        <h2 className="section__title">{t("home.anTitle")}</h2>
+        <p className="section__desc">{t("home.anText", { price: "1,000" })}</p>
+        <Link to="/games?analysis=1" className="btn" style={{ marginTop: "1rem" }}>{t("home.anButton")}</Link>
+      </section>
+
+      <section className="section">
         <h2 className="section__title">{t("home.combTitle")}</h2>
         <p className="section__desc">{t("home.combDesc")}</p>
         <Link to="/combinator" className="btn" style={{ marginTop: "1rem" }}>{t("home.openCombinator")}</Link>

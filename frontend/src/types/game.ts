@@ -8,12 +8,18 @@ export type FormSlice = {
   clean_sheet_rate?: number;
 };
 
+export type AnalysisInfo = { id: number; access: "open" | "pending" | "locked"; price: number };
+
 export type GameRow = {
   id: number;
   league: string;
   league_id?: number | null;
+  league_logo?: string | null;
   home: string;
   away: string;
+  home_logo?: string | null;
+  away_logo?: string | null;
+  analysis?: AnalysisInfo | null;
   kickoff: string;
   status: string;
   score: [number | null, number | null];
