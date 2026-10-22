@@ -53,6 +53,7 @@ INSTALLED_APPS = [
     "apps.commerce",
     "apps.games",
     "apps.combinator",
+    "apps.analysis",
     "apps.support",
 ]
 

@@ -14,6 +14,7 @@ from apps.accounts.views import (
     TelegramLinkView,
     TelegramLoginView,
 )
+from apps.analysis.views import AnalysisBuyView, AnalysisDetailView, AnalysisListView, MyAnalysesView
 from apps.checks.views import (
     AdminChecksView,
     AdminRecordDetailView,
@@ -85,6 +86,10 @@ urlpatterns = [
     path("api/combinator/pool/", CombinatorPoolView.as_view()),
     path("api/combinator/search/", CombinatorSearchView.as_view()),
     path("api/combinator/orders/", ComboOrderListCreateView.as_view()),
+    path("api/analysis/", AnalysisListView.as_view()),
+    path("api/analysis/mine/", MyAnalysesView.as_view()),
+    path("api/analysis/<int:pk>/", AnalysisDetailView.as_view()),
+    path("api/analysis/<int:pk>/buy/", AnalysisBuyView.as_view()),
     path("api/internal/packages/", InternalPackagesWebhook.as_view()),
     path("api/internal/settle/", InternalSettleWebhook.as_view()),
     path("api/admin/payments/", AdminPaymentsView.as_view()),

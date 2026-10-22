@@ -11,6 +11,7 @@ type NavItem = { to: string; label: Key | string; end?: boolean };
 const publicLinks: NavItem[] = [
   { to: "/", label: "nav.home", end: true },
   { to: "/checks", label: "nav.checks" },
+  { to: "/analysis", label: "nav.analysis" },
   { to: "/results", label: "nav.results" },
   { to: "/games", label: "nav.games" },
 ];

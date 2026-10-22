@@ -103,8 +103,13 @@ function goalModel(lh, la) {
     if (j === 0 && i > 0) wnH += p;
     if (i === 0 && j > 0) wnA += p;
   }
+  // ամենահավանական հաշիվները (խաղի վերլուծության համար)
+  const scores = [];
+  for (let i = 0; i <= MAXG; i++) for (let j = 0; j <= MAXG; j++) scores.push([i, j, grid[i][j] / tot]);
+  scores.sort((x, y) => y[2] - x[2]);
   return {
     pH, pD, pA, btts, wnH, wnA, csHome: csH, csAway: csA,
+    topScores: scores.slice(0, 5),
     over: (line) => overFrom(total, line),
     pTotal: (k) => total[k] ?? 0,
     homeOver: (line) => overFrom(homeG, line),
@@ -401,6 +406,28 @@ function buildCandidates(item) {
     }
   }
 
+  // ---- ՆՈՐ: խաղի ամբողջական վերլուծություն (կայքի «Խաղի վերլուծություն»՝ բոլոր շուկաները, գործակիցից անկախ) ----
+  const r3 = (x) => Math.round(x * 1000) / 1000;
+  const linesTable = (lines, fn) => lines.map((l) => [l, r3(fn(l))]);
+  const report = {
+    xg: [r2(lh), r2(la)],
+    p1x2: [r3(pH), r3(pD), r3(pA)],
+    btts: r3(model.btts),
+    cleanSheet: [r3(model.csHome), r3(model.csAway)],
+    goals: linesTable([0.5, 1.5, 2.5, 3.5, 4.5], (l) => model.over(l)),
+    homeGoals: linesTable([0.5, 1.5, 2.5], (l) => model.homeOver(l)),
+    awayGoals: linesTable([0.5, 1.5, 2.5], (l) => model.awayOver(l)),
+    firstHalf: linesTable([0.5, 1.5, 2.5], (l) => m1.over(l)),
+    scores: model.topScores.map(([i, j, p]) => [i, j, r3(p)]),
+    corners: cm ? { exp: r2(cm.mu), home: r2(cm.muH), away: r2(cm.muA), lines: linesTable([7.5, 8.5, 9.5, 10.5, 11.5, 12.5], (l) => overFrom(cm.total, l)) } : null,
+    cards: km ? { exp: r2(km.mu), home: r2(km.muH), away: r2(km.muA), lines: linesTable([2.5, 3.5, 4.5, 5.5, 6.5], (l) => overFrom(km.total, l)) } : null,
+    form: isNum(hf) && isNum(af) ? [hf, af] : null,
+    h2h: h2h?.available ? [h2h.home_wins, h2h.draws, h2h.away_wins, h2h.matches] : null,
+    injuries: deep.injuries ? [deep.injuries.home.length, deep.injuries.away.length] : null,
+    table: deep.table?.home && deep.table?.away ? [deep.table.home.rank, deep.table.away.rank] : null,
+    dataQuality: round1(dataQuality),
+  };
+
   // ֆավորիտ և ընտրության կողմը (որ չեկի ընտրությունները իրար չհակասեն)
   const fav = pH >= pA ? 'H' : 'A';
   const sideOf = (c) => {
@@ -420,7 +447,7 @@ function buildCandidates(item) {
     const line = `L5 n=${sH.played} H gf=${sH.goalsFor} ga=${sH.goalsAgainst} form=${sH.formLetters || '-'} | A gf=${sA.goalsFor} ga=${sA.goalsAgainst} form=${sA.formLetters || '-'}`;
     for (const c of out) c.reasons = [...c.reasons, line];
   }
-  return { candidates: out, model: { lh: r2(lh), la: r2(la), sources: built?.sources ?? [], corners: cm ? r2(cm.mu) : null, cards: km ? r2(km.mu) : null, dataQuality: round1(dataQuality) } };
+  return { candidates: out, report, model: { lh: r2(lh), la: r2(la), sources: built?.sources ?? [], corners: cm ? r2(cm.mu) : null, cards: km ? r2(km.mu) : null, dataQuality: round1(dataQuality) } };
 }
 
 const output = [];
@@ -434,6 +461,7 @@ for (const item of $input.all()) {
       homeTeamName: item.json.homeTeamName,
       awayTeamName: item.json.awayTeamName,
       model: res.model ?? null,
+      report: res.report ?? null,
       candidates: res.candidates ?? [],
     },
   });

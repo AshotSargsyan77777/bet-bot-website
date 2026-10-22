@@ -17,6 +17,8 @@ import { Games } from "./pages/Games";
 import { GameDetail } from "./pages/GameDetail";
 import { Combinator } from "./pages/Combinator";
 import { Results } from "./pages/Results";
+import { Analysis } from "./pages/Analysis";
+import { AnalysisDetail } from "./pages/AnalysisDetail";
 import { LangProvider, useT } from "./i18n";
 import "./styles.css";
 
@@ -88,6 +90,8 @@ export default function App() {
               <Route index element={<Home />} />
               <Route path="checks" element={<Checks />} />
               <Route path="results" element={<Results />} />
+              <Route path="analysis" element={<Analysis />} />
+              <Route path="analysis/:id" element={<Private><AnalysisDetail /></Private>} />
               <Route path="pay/:packageKey" element={<Private><Pay /></Private>} />
               <Route path="status" element={<Status />} />
               <Route path="promo" element={<Promo />} />

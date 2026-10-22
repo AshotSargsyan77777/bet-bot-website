@@ -56,6 +56,9 @@ class Payment(models.Model):
     combo_order = models.OneToOneField(
         "combinator.ComboOrder", on_delete=models.SET_NULL, null=True, blank=True, related_name="payment"
     )
+    analysis_order = models.OneToOneField(
+        "analysis.AnalysisOrder", on_delete=models.SET_NULL, null=True, blank=True, related_name="payment"
+    )
     status = models.CharField(max_length=16, choices=STATUS_CHOICES, default=STATUS_PENDING)
     amount = models.PositiveIntegerField(default=0)  # AMD, package price at the time of payment
     receipt = models.ImageField(upload_to="receipts/%Y/%m/")
@@ -70,10 +73,13 @@ class Payment(models.Model):
         indexes = [models.Index(fields=["status", "-created_at"], name="payment_status_created_idx")]
         constraints = [
             # one pending payment per package (a new receipt for the same package replaces the old one);
-            # payments for different packages wait side by side; combinator tiers are separate orders
+            # payments for different packages wait side by side; combinator tiers and match analyses are
+            # separate orders
             models.UniqueConstraint(
                 fields=["user", "package_key"],
-                condition=models.Q(status="pending") & ~models.Q(package_key__startswith="combo_"),
+                condition=models.Q(status="pending")
+                & ~models.Q(package_key__startswith="combo_")
+                & ~models.Q(package_key="match_analysis"),
                 name="one_pending_payment_per_package",
             )
         ]

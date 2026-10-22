@@ -30,8 +30,12 @@ COMBO_TIERS = {
     "combo_x20": {"label": "🎯 Կոնստրուկտոր x20", "price": 8000, "min": 19.0, "max": 21.0, "upto": 21.0},
 }
 
+# Full analysis of one match (all markets), bought per match
+ANALYSIS_KEY = "match_analysis"
+ANALYSIS_PRODUCT = {ANALYSIS_KEY: {"label": "🔍 Խաղի վերլուծություն", "price": 1000}}
+
 # Everything that can be paid for (labels/prices for payments, admin and revenue)
-ALL_PRODUCTS = {**PACKAGES, **COMBO_TIERS}
+ALL_PRODUCTS = {**PACKAGES, **COMBO_TIERS, **ANALYSIS_PRODUCT}
 
 
 def product_label(key: str) -> str:
