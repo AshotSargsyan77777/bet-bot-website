@@ -20,3 +20,26 @@ PACKAGES = {
 N8N_KEYS = [k for k in PACKAGES if k not in ("pkg_vip", "pkg_5")]
 PROMO_PACKAGES = ["promo_5x"]
 PURCHASABLE_KEYS = [k for k in PACKAGES if k not in ("promo_5x", "pkg_5")]
+
+# Combinator checks (VIP builds own combination and pays per check). The tier is chosen by the
+# upper bound of the requested total odds: up to 5.5 → x5, up to 10.5 → x10, up to 15.8 → x15, up to 21 → x20.
+COMBO_TIERS = {
+    "combo_x5": {"label": "🎯 Կոնստրուկտոր x5", "price": 3000, "min": 4.8, "max": 5.3, "upto": 5.5},
+    "combo_x10": {"label": "🎯 Կոնստրուկտոր x10", "price": 5000, "min": 9.5, "max": 10.5, "upto": 10.5},
+    "combo_x15": {"label": "🎯 Կոնստրուկտոր x15", "price": 6000, "min": 14.3, "max": 15.8, "upto": 15.8},
+    "combo_x20": {"label": "🎯 Կոնստրուկտոր x20", "price": 8000, "min": 19.0, "max": 21.0, "upto": 21.0},
+}
+
+# Everything that can be paid for (labels/prices for payments, admin and revenue)
+ALL_PRODUCTS = {**PACKAGES, **COMBO_TIERS}
+
+
+def product_label(key: str) -> str:
+    return ALL_PRODUCTS.get(key, {}).get("label", key)
+
+
+def combo_tier_for(target_max: float) -> str | None:
+    for key, tier in COMBO_TIERS.items():
+        if target_max <= tier["upto"]:
+            return key
+    return None

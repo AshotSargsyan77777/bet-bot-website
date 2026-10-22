@@ -3,7 +3,7 @@ from decimal import Decimal
 from django.conf import settings
 from rest_framework import serializers
 
-from apps.checks.constants import PACKAGES, PURCHASABLE_KEYS
+from apps.checks.constants import PURCHASABLE_KEYS, product_label
 from apps.checks.models import DailyCheck
 from apps.checks.services.checks_logic import check_is_ready
 from apps.commerce.models import Payment, SelectionCandidate
@@ -20,7 +20,7 @@ class PaymentSerializer(serializers.ModelSerializer):
         read_only_fields = fields
 
     def get_package_label(self, obj):
-        return PACKAGES.get(obj.package_key, {}).get("label", obj.package_key)
+        return product_label(obj.package_key)
 
 
 class PaymentCreateSerializer(serializers.ModelSerializer):
@@ -73,7 +73,7 @@ class AdminPaymentSerializer(serializers.ModelSerializer):
         )
 
     def get_package_label(self, obj):
-        return PACKAGES.get(obj.package_key, {}).get("label", obj.package_key)
+        return product_label(obj.package_key)
 
     def get_receipt_url(self, obj):
         return f"/api/admin/payments/{obj.id}/receipt/" if obj.receipt else None

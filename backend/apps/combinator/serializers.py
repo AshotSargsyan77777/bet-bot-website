@@ -1,5 +1,7 @@
 from rest_framework import serializers
 
+from apps.combinator.models import ComboOrder
+
 MARKETS = [
     "MATCH_WINNER",
     "DOUBLE_CHANCE",
@@ -21,25 +23,48 @@ MARKETS = [
 ]
 
 
-class CombinatorSearchSerializer(serializers.Serializer):
-    target_odds_min = serializers.FloatField(min_value=1.01, max_value=10000, default=1.01)
-    target_odds_max = serializers.FloatField(min_value=1.01, max_value=10000, default=100)
-    legs_count = serializers.IntegerField(min_value=1, max_value=20, required=False, allow_null=True)
-    legs_min = serializers.IntegerField(min_value=1, max_value=20, required=False, allow_null=True)
-    legs_max = serializers.IntegerField(min_value=1, max_value=20, required=False, allow_null=True)
-    leg_odds_min = serializers.FloatField(min_value=1.0, max_value=1000, default=1.01)
-    leg_odds_max = serializers.FloatField(min_value=1.0, max_value=1000, default=50)
-    markets = serializers.ListField(
-        child=serializers.CharField(max_length=64), required=False, allow_empty=True, max_length=len(MARKETS)
-    )
-    max_results = serializers.IntegerField(min_value=1, max_value=20, default=20)
+class ComboSearchSerializer(serializers.Serializer):
+    """VIP combinator search: total odds range and the maximum number of games."""
+
+    target_odds_min = serializers.FloatField(min_value=1.5, max_value=21)
+    target_odds_max = serializers.FloatField(min_value=1.5, max_value=21)
+    max_legs = serializers.IntegerField(min_value=2, max_value=12, default=7)
 
     def validate(self, attrs):
         if attrs["target_odds_min"] > attrs["target_odds_max"]:
-            raise serializers.ValidationError("Min ընդհանուր գործակիցը չի կարող մեծ լինել max-ից")
-        if attrs["leg_odds_min"] > attrs["leg_odds_max"]:
-            raise serializers.ValidationError("Ողի min գործակիցը չի կարող մեծ լինել max-ից")
-        lmin, lmax = attrs.get("legs_min"), attrs.get("legs_max")
-        if lmin and lmax and lmin > lmax:
-            raise serializers.ValidationError("legs_min > legs_max")
+            raise serializers.ValidationError("Ընդհանուր գործակցի «սկսած»-ը չի կարող մեծ լինել «մինչև»-ից")
         return attrs
+
+
+class ComboOrderCreateSerializer(serializers.Serializer):
+    token = serializers.CharField(max_length=4000)
+    receipt = serializers.ImageField()
+
+    def validate_receipt(self, value):
+        from apps.commerce.serializers import PaymentCreateSerializer
+
+        return PaymentCreateSerializer().validate_receipt(value)
+
+
+class ComboOrderSerializer(serializers.ModelSerializer):
+    label = serializers.CharField(read_only=True)
+    legs = serializers.SerializerMethodField()
+    body_text = serializers.SerializerMethodField()
+    legs_count = serializers.SerializerMethodField()
+
+    class Meta:
+        model = ComboOrder
+        fields = ("id", "tier", "label", "price", "combined_odds", "hit_chance", "legs_count", "legs", "body_text",
+                  "status", "created_at", "paid_at")
+
+    def _paid(self, obj):
+        return obj.status == obj.STATUS_PAID
+
+    def get_legs(self, obj):
+        return obj.legs if self._paid(obj) else []  # picks stay hidden until the payment is approved
+
+    def get_body_text(self, obj):
+        return obj.body_text if self._paid(obj) else ""
+
+    def get_legs_count(self, obj):
+        return len(obj.legs)

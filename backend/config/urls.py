@@ -39,7 +39,7 @@ from apps.commerce.views import (
     StatusView,
     VipStatusView,
 )
-from apps.combinator.views import CombinatorPoolView, CombinatorSearchView
+from apps.combinator.views import ComboOrderListCreateView, CombinatorPoolView, CombinatorSearchView
 from apps.games.views import GameDetailView, GameListView
 from apps.support.views import AdminSupportDetailView, AdminSupportView, SupportTicketListCreateView
 
@@ -84,6 +84,7 @@ urlpatterns = [
     path("api/games/<int:fixture_id>/", GameDetailView.as_view()),
     path("api/combinator/pool/", CombinatorPoolView.as_view()),
     path("api/combinator/search/", CombinatorSearchView.as_view()),
+    path("api/combinator/orders/", ComboOrderListCreateView.as_view()),
     path("api/internal/packages/", InternalPackagesWebhook.as_view()),
     path("api/internal/settle/", InternalSettleWebhook.as_view()),
     path("api/admin/payments/", AdminPaymentsView.as_view()),
