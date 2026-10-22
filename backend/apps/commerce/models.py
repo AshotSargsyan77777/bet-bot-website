@@ -9,6 +9,9 @@ class Subscription(models.Model):
     package_key = models.CharField(max_length=32, choices=[(k, k) for k in PACKAGES])
     valid_date = models.CharField(max_length=10, blank=True, null=True)
     snapshot_text = models.TextField(blank=True, default="")
+    record = models.ForeignKey(
+        "checks.CheckRecord", on_delete=models.SET_NULL, null=True, blank=True, related_name="subscriptions"
+    )
     from_promo = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
     is_active = models.BooleanField(default=True)
@@ -48,6 +51,7 @@ class Payment(models.Model):
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="payments")
     package_key = models.CharField(max_length=32, choices=[(k, k) for k in PACKAGES])
     status = models.CharField(max_length=16, choices=STATUS_CHOICES, default=STATUS_PENDING)
+    amount = models.PositiveIntegerField(default=0)  # AMD, package price at the time of payment
     receipt = models.ImageField(upload_to="receipts/%Y/%m/")
     created_at = models.DateTimeField(auto_now_add=True)
     reviewed_at = models.DateTimeField(null=True, blank=True)

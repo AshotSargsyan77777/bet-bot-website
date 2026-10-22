@@ -199,7 +199,7 @@ for (const tier of ['standard', 'champions', 'europa', 'promo']) {
       package_score: Math.round(found.best.score * 100) / 100,
       selection_count: sel.length,
       selections: sel.map((s) => ({
-        fixture: s.fixtureLabel, league: s.leagueId, bookmaker: s.bookmaker, market: s.market, selection: s.selection,
+        fixture: s.fixtureLabel, fixture_id: s.fixtureId, league: s.leagueId, bookmaker: s.bookmaker, market: s.market, selection: s.selection,
         odd: s.odd, probability: s.probability, model_probability: s.modelProbability, market_probability: s.marketProbability,
         edge: s.edge, data_quality: s.dataQuality,
         confidence: s.confidence, compatibility: s.compatibility, risk: s.risk, reasons: s.reasons,

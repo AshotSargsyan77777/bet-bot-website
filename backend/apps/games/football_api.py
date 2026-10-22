@@ -74,6 +74,22 @@ def head_to_head(team1: int, team2: int, last: int = 5) -> list:
     return data.get("response") or []
 
 
+def fixtures_by_ids(ids: list[int]) -> list:
+    """Up to 20 fixtures per request (API-Football limit)."""
+    out: list = []
+    ids = sorted({int(i) for i in ids})
+    for k in range(0, len(ids), 20):
+        chunk = ids[k : k + 20]
+        data = _get("/fixtures", {"ids": "-".join(str(i) for i in chunk)}, cache_ttl=300)
+        out.extend(data.get("response") or [])
+    return out
+
+
+def fixture_statistics(fixture_id: int) -> list:
+    data = _get("/fixtures/statistics", {"fixture": fixture_id}, cache_ttl=24 * 3600)
+    return data.get("response") or []
+
+
 def is_configured() -> bool:
     return bool(settings.API_FOOTBALL_KEY)
 

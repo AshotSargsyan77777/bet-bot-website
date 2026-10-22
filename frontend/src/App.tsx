@@ -16,6 +16,7 @@ import { Admin } from "./pages/Admin";
 import { Games } from "./pages/Games";
 import { GameDetail } from "./pages/GameDetail";
 import { Combinator } from "./pages/Combinator";
+import { Results } from "./pages/Results";
 import "./styles.css";
 
 const qc = new QueryClient({
@@ -82,6 +83,7 @@ export default function App() {
             <Route element={<Layout />}>
               <Route index element={<Home />} />
               <Route path="checks" element={<Checks />} />
+              <Route path="results" element={<Results />} />
               <Route path="pay/:packageKey" element={<Private><Pay /></Private>} />
               <Route path="status" element={<Status />} />
               <Route path="promo" element={<Promo />} />

@@ -5,6 +5,7 @@ from apps.checks.constants import N8N_KEYS, PACKAGES, UNAVAILABLE_TEXT
 from apps.checks.models import AppSettings, DailyCheck
 from apps.checks.services.checks_logic import check_is_ready
 from apps.checks.services.formatting import format_package
+from apps.checks.services.records import record_published_check
 from apps.checks.services.time import yerevan_today
 from apps.commerce.promo import generate_promo_codes
 
@@ -23,6 +24,7 @@ def apply_n8n_packages(packages: list) -> dict:
         dc.selections_json = []
         dc.combined_odds = None
         dc.quality = ""
+        dc.current_record = None
         dc.save()
 
     available = 0
@@ -48,6 +50,7 @@ def apply_n8n_packages(packages: list) -> dict:
             dc.combined_odds = None
         dc.quality = str(pkg.get("quality") or "")[:16]
         dc.save()
+        record_published_check(dc, today)
         available += 1
 
     app.checks_date = today
@@ -68,6 +71,7 @@ def apply_n8n_packages(packages: list) -> dict:
         new_codes = generate_promo_codes(settings.PROMOS_PER_UPDATE)
 
     ready_list = [k for k in N8N_KEYS if check_is_ready(DailyCheck.objects.get(package_key=k))]
+    _announce_ready(app, today, ready_list)
     return {
         "ok": True,
         "received": len(packages),
@@ -76,3 +80,17 @@ def apply_n8n_packages(packages: list) -> dict:
         "ready": ready_list,
         "new_promo_codes": new_codes,
     }
+
+
+def _announce_ready(app: AppSettings, today: str, ready_list: list[str]) -> None:
+    """Once a day, tell Telegram-linked users that today's checks are ready."""
+    from apps.accounts.telegram import broadcast, site_url
+
+    paid = [k for k in ready_list if PACKAGES[k]["price"] > 0]
+    if not paid or app.ready_notified_date == today:
+        return
+    app.ready_notified_date = today
+    app.save(update_fields=["ready_notified_date"])
+    lines = "\n".join(f"• {PACKAGES[k]['label']}" for k in paid)
+    link = site_url("/checks")
+    broadcast(f"📊 Այսօրվա չեկերը պատրաստ են՝\n{lines}" + (f"\n\n👉 {link}" if link else ""))

@@ -244,6 +244,11 @@ VIP_CHANNEL_LINK = os.environ.get("VIP_CHANNEL_LINK", "")
 PROMO_FROM_3X = env_bool("PROMO_FROM_3X", False)
 PROMOS_PER_UPDATE = max(0, int(os.environ.get("PROMOS_PER_UPDATE", "1")))
 API_FOOTBALL_KEY = os.environ.get("API_FOOTBALL_KEY", "")
+# Telegram (same bot as index.js): Login Widget + notifications
+TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "")
+TELEGRAM_BOT_USERNAME = os.environ.get("TELEGRAM_BOT_USERNAME", "").lstrip("@")
+TELEGRAM_ASYNC = env_bool("TELEGRAM_ASYNC", True)
+SITE_URL = os.environ.get("SITE_URL", "") or (f"https://{RAILWAY_PUBLIC_DOMAIN}" if RAILWAY_PUBLIC_DOMAIN else "")
 # How long computed team form (last N matches) is reused before re-fetching from API-Football.
 FORM_STATS_TTL_MINUTES = int(os.environ.get("FORM_STATS_TTL_MINUTES", "360"))
 

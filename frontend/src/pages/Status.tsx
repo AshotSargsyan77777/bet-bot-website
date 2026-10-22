@@ -1,8 +1,9 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import { Link } from "react-router-dom";
 import { api, type Paginated } from "../api/client";
 import { PageHeader } from "../components/PageHeader";
+import { TelegramLoginButton, type TelegramUser } from "../components/TelegramLoginButton";
 import { CheckPreview } from "../components/stats/CheckPreview";
 import { useAuth } from "../context/AuthContext";
 import type { MyCheck } from "../types/catalog";
@@ -34,10 +35,11 @@ function ProfileCard() {
   const changePassword = useMutation({
     mutationFn: () =>
       api("/api/auth/password/", { method: "POST", json: { current_password: current, new_password: next } }),
-    onSuccess: () => {
+    onSuccess: async () => {
       setCurrent("");
       setNext("");
-      setMsg("✅ Գաղտնաբառը փոխվեց");
+      setMsg("✅ Գաղտնաբառը պահպանվեց");
+      await refreshMe();
     },
   });
 
@@ -69,18 +71,73 @@ function ProfileCard() {
           changePassword.mutate();
         }}
       >
-        <div className="field">
-          <span className="field__label">Ընթացիկ գաղտնաբառ</span>
-          <input type="password" value={current} onChange={(e) => setCurrent(e.target.value)} required autoComplete="current-password" />
-        </div>
+        {user?.has_password ? (
+          <div className="field">
+            <span className="field__label">Ընթացիկ գաղտնաբառ</span>
+            <input type="password" value={current} onChange={(e) => setCurrent(e.target.value)} required autoComplete="current-password" />
+          </div>
+        ) : (
+          <p className="field__hint">Դուք մուտք եք գործել Telegram-ով. սահմանեք գաղտնաբառ՝ օգտանունով մուտքի համար։</p>
+        )}
         <div className="field">
           <span className="field__label">Նոր գաղտնաբառ (min 8)</span>
           <input type="password" value={next} onChange={(e) => setNext(e.target.value)} required minLength={8} autoComplete="new-password" />
         </div>
         {changePassword.isError && <p className="field__error">{changePassword.error.message}</p>}
-        <button type="submit" className="secondary" disabled={changePassword.isPending}>Փոխել գաղտնաբառը</button>
+        <button type="submit" className="secondary" disabled={changePassword.isPending}>
+          {user?.has_password ? "Փոխել գաղտնաբառը" : "Սահմանել գաղտնաբառ"}
+        </button>
       </form>
       {msg && <p style={{ marginTop: "0.75rem" }}>{msg}</p>}
+    </div>
+  );
+}
+
+function TelegramCard() {
+  const { user, refreshMe } = useAuth();
+  const tg = user?.telegram;
+  const link = useMutation({
+    mutationFn: (data: TelegramUser) => api("/api/me/telegram/", { method: "POST", json: data }),
+    onSuccess: () => refreshMe(),
+  });
+  const toggle = useMutation({
+    mutationFn: (notifications: boolean) => api("/api/me/telegram/", { method: "PATCH", json: { notifications } }),
+    onSuccess: () => refreshMe(),
+  });
+  const unlink = useMutation({
+    mutationFn: () => api("/api/me/telegram/", { method: "DELETE" }),
+    onSuccess: () => refreshMe(),
+  });
+  const onAuth = useCallback((data: TelegramUser) => link.mutate(data), [link]);
+  const error = link.error ?? toggle.error ?? unlink.error;
+
+  return (
+    <div className="card card--interactive">
+      <h3>✈️ Telegram</h3>
+      {tg ? (
+        <>
+          <p>Կապված է՝ <strong>{tg.username ? `@${tg.username}` : tg.first_name}</strong></p>
+          <label style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
+            <input
+              type="checkbox"
+              checked={tg.notifications}
+              disabled={toggle.isPending}
+              onChange={(e) => toggle.mutate(e.target.checked)}
+              style={{ width: "auto" }}
+            />
+            Ծանուցումներ Telegram-ով (վճարում, պատասխաններ, օրվա չեկեր)
+          </label>
+          <button type="button" className="secondary" style={{ marginTop: "0.75rem" }} disabled={unlink.isPending} onClick={() => unlink.mutate()}>
+            Անջատել Telegram-ը
+          </button>
+        </>
+      ) : (
+        <>
+          <p className="muted">Կապեք Telegram-ը՝ վճարման հաստատման, support-ի պատասխանների և օրվա չեկերի մասին ծանուցումներ ստանալու համար։</p>
+          <TelegramLoginButton onAuth={onAuth} />
+        </>
+      )}
+      {error && <p className="field__error">{error.message}</p>}
     </div>
   );
 }
@@ -152,6 +209,7 @@ export function Status() {
           )}
         </div>
         <ProfileCard />
+        <TelegramCard />
       </div>
       {mine.data?.active && mine.data.text && (
         <div className="card">
