@@ -429,6 +429,12 @@ export const hy = {
   "login.showPassword": "Ցույց տալ գաղտնաբառը",
   "login.hidePassword": "Թաքցնել գաղտնաբառը",
   "login.usernameRegister": "Օգտանուն",
+  "admin.adminsTitle": "👥 Ադմիններ",
+  "admin.adminsHint": "Մարդը նախ պետք է գրանցվի կայքում, հետո գրեք նրա օգտանունը կամ email-ը։ Նոր ադմինը պետք է թարմացնի էջը (կամ նորից մուտք գործի)։",
+  "admin.makeAdmin": "Դարձնել ադմին",
+  "admin.adminAdded": "✅ {username}-ը այժմ ադմին է",
+  "admin.removeAdmin": "Հանել ադմինից",
+  "admin.confirmRemoveAdmin": "Հանե՞լ {username}-ի ադմինի իրավունքը",
 } as const;
 
 export type Key = keyof typeof hy;

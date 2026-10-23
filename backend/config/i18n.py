@@ -68,6 +68,9 @@ MESSAGES: dict[str, tuple[str, str]] = {
         "The link is invalid or expired, request a new one",
         "Ссылка недействительна или устарела, запросите новую",
     ),
+    "Այդպիսի օգտատեր չի գտնվել": ("No such user", "Такой пользователь не найден"),
+    "Չեք կարող հանել ձեր սեփական ադմինի իրավունքը": ("You can't remove your own admin rights", "Нельзя снять права админа с самого себя"),
+    "Գլխավոր ադմինին այստեղից հանել հնարավոր չէ": ("The main admin can't be removed here", "Главного админа здесь снять нельзя"),
     "Նշեք email հասցե": ("Enter an email address", "Укажите email"),
     "Խաղն արդեն սկսվել է": ("The match has already started", "Матч уже начался"),
     "Այս վերլուծությունը արդեն գնված է կամ սպասում է հաստատման": (

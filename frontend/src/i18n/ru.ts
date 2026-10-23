@@ -411,4 +411,10 @@ export const ru: Record<Key, string> = {
   "login.showPassword": "Показать пароль",
   "login.hidePassword": "Скрыть пароль",
   "login.usernameRegister": "Имя пользователя",
+  "admin.adminsTitle": "👥 Админы",
+  "admin.adminsHint": "Человек сначала регистрируется на сайте, затем введите его имя пользователя или email. Новому админу нужно обновить страницу (или войти заново).",
+  "admin.makeAdmin": "Сделать админом",
+  "admin.adminAdded": "✅ {username} теперь админ",
+  "admin.removeAdmin": "Снять админа",
+  "admin.confirmRemoveAdmin": "Снять права админа с {username}?",
 };
