@@ -135,3 +135,10 @@ class NotificationTests(APITestCase):
         self.assertEqual(len(texts), 1)
         self.assertIn("պատրաստ են", texts[0])
         self.assertIn("https://site.test/checks", texts[0])
+
+
+class TelegramWidgetHeadersTests(APITestCase):
+    def test_login_popup_keeps_its_opener(self):
+        """With COOP "same-origin" the Telegram popup could not hand the login back and just closed."""
+        r = self.client.get("/api/config/")
+        self.assertEqual(r["Cross-Origin-Opener-Policy"], "same-origin-allow-popups")
