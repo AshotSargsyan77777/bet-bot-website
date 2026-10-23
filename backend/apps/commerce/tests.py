@@ -96,7 +96,6 @@ class PaymentFlowTests(APITestCase):
         with self.settings(VIP_CHANNEL_LINK="https://t.me/+secret"):
             self.client.force_authenticate(self.user)
             self.assertEqual(self.client.get("/api/vip/status/").data["link"], "")
-            self.assertEqual(self.client.post("/api/combinator/search/", {}, format="json").status_code, 403)
             self.assertEqual(self.pay("pkg_vip").status_code, 201)
             payment = Payment.objects.get(user=self.user)
             self.client.force_authenticate(self.admin)

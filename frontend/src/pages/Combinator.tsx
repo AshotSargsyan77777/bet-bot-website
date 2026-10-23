@@ -123,7 +123,7 @@ export function Combinator() {
   return (
     <div>
       <PageHeader
-        eyebrow="VIP"
+        eyebrow="Goalking"
         title={t("comb.title")}
         subtitle={t("comb.subtitle")}
       />

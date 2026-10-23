@@ -1,7 +1,5 @@
-import { useQuery } from "@tanstack/react-query";
 import { useEffect, useRef } from "react";
 import { Link, NavLink, Outlet, useLocation } from "react-router-dom";
-import { api } from "../api/client";
 import { useAuth } from "../context/AuthContext";
 import { LangSwitcher, useT, type Key } from "../i18n";
 import { SiteFooter } from "./SiteFooter";
@@ -35,17 +33,10 @@ export function Layout() {
   }, [location.pathname]);
   const isHome = location.pathname === "/";
 
-  const vip = useQuery({
-    queryKey: ["vip", user?.id],
-    queryFn: () => api<{ is_vip: boolean }>("/api/vip/status/"),
-    enabled: !!user,
-  });
-  const isVip = !!vip.data?.is_vip || !!user?.is_admin;
-
   const links: NavItem[] = [
     ...publicLinks,
     ...(user ? loggedInLinks : []),
-    ...(isVip ? [{ to: "/combinator", label: "nav.combinator" }] : []),
+    { to: "/combinator", label: "nav.combinator" },
     ...(user?.is_admin ? [{ to: "/admin", label: "Admin" }] : []),
   ];
 
@@ -85,7 +76,7 @@ export function Layout() {
       <main className="layout__main">
         <Outlet />
       </main>
-      <SiteFooter showCombinator={isVip} />
+      <SiteFooter />
     </div>
   );
 }
