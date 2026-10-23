@@ -222,8 +222,8 @@ export const ru: Record<Key, string> = {
   "games.formPending": " · форма {n} матчей ещё рассчитывается",
   "games.reset": "Сбросить фильтры",
   "games.none": "Матчи не найдены — измените дату или нажмите «Сбросить фильтры».",
-  "games.homeL5": "Дома L5",
-  "games.awayL5": "В гостях L5",
+  "games.homeL5": "Хозяева · последние 5 матчей",
+  "games.awayL5": "Гости · последние 5 матчей",
   "games.details": "Подробнее →",
 
   "game.badLink": "Неверная ссылка",
@@ -417,4 +417,12 @@ export const ru: Record<Key, string> = {
   "admin.adminAdded": "✅ {username} теперь админ",
   "admin.removeAdmin": "Снять админа",
   "admin.confirmRemoveAdmin": "Снять права админа с {username}?",
+  "st.upcoming": "Не начался",
+  "st.halftime": "Перерыв",
+  "st.live": "Идёт",
+  "st.finished": "Завершён",
+  "st.postponed": "Перенесён",
+  "st.cancelled": "Отменён",
+  "st.interrupted": "Прерван",
+  "games.formStat": "побед {w}% · {g} гола/матч",
 };

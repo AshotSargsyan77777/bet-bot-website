@@ -237,8 +237,8 @@ export const hy = {
   "games.formPending": " · {n} խաղի ձևը դեռ հաշվարկվում է",
   "games.reset": "Մաքրել ֆիլտրերը",
   "games.none": "Խաղեր չեն գտնվել — փոխեք ամսաթիվը կամ սեղմեք «Մաքրել ֆիլտրերը»։",
-  "games.homeL5": "Տուն L5",
-  "games.awayL5": "Հյուր L5",
+  "games.homeL5": "Տուն · վերջին 5 խաղ",
+  "games.awayL5": "Հյուր · վերջին 5 խաղ",
   "games.details": "Մանրամասն →",
 
   // game detail
@@ -435,6 +435,14 @@ export const hy = {
   "admin.adminAdded": "✅ {username}-ը այժմ ադմին է",
   "admin.removeAdmin": "Հանել ադմինից",
   "admin.confirmRemoveAdmin": "Հանե՞լ {username}-ի ադմինի իրավունքը",
+  "st.upcoming": "Կսկսվի",
+  "st.halftime": "Ընդմիջում",
+  "st.live": "Ընթացքում",
+  "st.finished": "Ավարտված",
+  "st.postponed": "Հետաձգված",
+  "st.cancelled": "Չեղարկված",
+  "st.interrupted": "Ընդհատված",
+  "games.formStat": "հաղթանակ {w}% · {g} գոլ/խաղ",
 } as const;
 
 export type Key = keyof typeof hy;

@@ -30,6 +30,7 @@ export function Layout() {
   // On phones the drawer would otherwise stay open over the new page after tapping a link.
   useEffect(() => {
     if (menuRef.current) menuRef.current.open = false;
+    window.scrollTo(0, 0); // a new page starts at the top (e.g. a match opened from the bottom of the list)
   }, [location.pathname]);
   const isHome = location.pathname === "/";
 

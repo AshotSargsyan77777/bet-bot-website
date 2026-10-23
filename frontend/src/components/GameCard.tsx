@@ -3,6 +3,7 @@ import { LIVE_STATUSES, type GameRow } from "../types/game";
 import { useT } from "../i18n";
 import { FormBars } from "./FormBars";
 import { TeamLogo } from "./TeamLogo";
+import { isUpcoming, kickoffTime, statusKey } from "../utils/matchStatus";
 
 function statusClass(status: string) {
   if (LIVE_STATUSES.includes(status)) return "game-card--live";
@@ -12,11 +13,10 @@ function statusClass(status: string) {
 
 export function GameCard({ game, compact }: { game: GameRow; compact?: boolean }) {
   const { t } = useT();
-  const score =
-    game.score[0] != null && game.score[1] != null
-      ? `${game.score[0]} : ${game.score[1]}`
-      : "vs";
-  const time = new Date(game.kickoff).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  const hasScore = game.score[0] != null && game.score[1] != null;
+  const upcoming = isUpcoming(game.status) || !hasScore;
+  const statusLabel = statusKey(game.status);
+  const date = new Date(game.kickoff).toLocaleDateString([], { day: "numeric", month: "short" });
 
   return (
     <article className={`game-card ${statusClass(game.status)} ${compact ? "game-card--compact" : ""}`}>
@@ -33,15 +33,19 @@ export function GameCard({ game, compact }: { game: GameRow; compact?: boolean }
           <TeamLogo src={game.home_logo} size={32} />
           {game.home}
         </span>
-        <span className="game-card__score">{score}</span>
+        {upcoming ? (
+          <span className="game-card__kickoff">{kickoffTime(game.kickoff)}</span>
+        ) : (
+          <span className="game-card__score">{`${game.score[0]} : ${game.score[1]}`}</span>
+        )}
         <span className="game-card__team game-card__team--away">
           <TeamLogo src={game.away_logo} size={32} />
           {game.away}
         </span>
       </div>
       <footer className="game-card__meta">
-        <span>{time}</span>
-        <span>{game.status}</span>
+        <span>{date}</span>
+        <span>{statusLabel ? t(statusLabel) : game.status}</span>
       </footer>
       {!compact && (
         <div className="game-card__forms">

@@ -668,6 +668,25 @@ label {
   font-weight: 600;
 }
 
+/* the whole card opens the match ("Details" link stretched over the card) */
+.game-card__link::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+}
+
+.game-card {
+  cursor: pointer;
+}
+
+.game-card__kickoff {
+  font-size: 1.35rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+}
+
 .games-grid {
   display: grid;
   gap: 1rem;

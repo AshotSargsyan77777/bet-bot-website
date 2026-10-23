@@ -9,6 +9,7 @@ import type { H2HMatch, TeamForm } from "../types/form";
 import { LIVE_STATUSES, type AnalysisInfo } from "../types/game";
 import { MatchAnalysisSection } from "../components/analysis/MatchAnalysisSection";
 import { TeamLogo } from "../components/TeamLogo";
+import { isUpcoming, kickoffTime, statusKey } from "../utils/matchStatus";
 import { useT } from "../i18n";
 
 type DetailPayload = {
@@ -72,14 +73,14 @@ export function GameDetail() {
         {LIVE_STATUSES.includes(statusShort) && (
           <p className="match-hero__live"><span className="live-dot" /> LIVE {elapsed != null ? `${elapsed}'` : ""}</p>
         )}
-        <p className="muted">{statusShort}</p>
+        <p className="muted">{statusKey(statusShort) ? t(statusKey(statusShort)!) : statusShort}</p>
         <div className="match-hero__teams">
           <span className="match-hero__team">
             <TeamLogo src={data.home_logo} size={56} alt={data.home} />
             {data.home}
           </span>
           <div className="match-hero__score">
-            {scoreHome ?? "—"} : {scoreAway ?? "—"}
+            {isUpcoming(statusShort) && scoreHome == null ? kickoffTime(kickoff) : `${scoreHome ?? "—"} : ${scoreAway ?? "—"}`}
           </div>
           <span className="match-hero__team">
             <TeamLogo src={data.away_logo} size={56} alt={data.away} />
