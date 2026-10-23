@@ -82,6 +82,10 @@ MESSAGES: dict[str, tuple[str, str]] = {
 
 PATTERNS: list[tuple[re.Pattern, tuple[str, str]]] = [
     (
+        re.compile(r"^Այսօր հասանելի է ընդամենը (\d+) խաղ$"),
+        ("Only {0} matches are available today", "Сегодня доступно только {0} матчей"),
+    ),
+    (
         re.compile(r"^Նկարը չափազանց մեծ է \(max (\d+) MB\)$"),
         ("Image is too large (max {0} MB)", "Изображение слишком большое (макс. {0} МБ)"),
     ),

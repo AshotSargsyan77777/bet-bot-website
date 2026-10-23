@@ -68,8 +68,8 @@ class CombinatorFlowTests(APITestCase):
         app.save()
         SelectionCandidate.objects.create(fixture_name="E - F", market="BTTS", selection="Yes", odd=1.6)
 
-    def search(self, tier="combo_x5", max_legs=7):
-        return self.client.post("/api/combinator/search/", {"tier": tier, "max_legs": max_legs}, format="json")
+    def search(self, tier="combo_x5", legs=3):
+        return self.client.post("/api/combinator/search/", {"tier": tier, "legs": legs}, format="json")
 
     def buy(self, tier="combo_x5"):
         return self.client.post("/api/combinator/orders/", {"tier": tier, "receipt": receipt()}, format="multipart")
@@ -79,6 +79,7 @@ class CombinatorFlowTests(APITestCase):
         self.assertEqual(r.data["count"], 4)
         self.assertNotIn("candidates", r.data)
         self.assertEqual([t["price"] for t in r.data["tiers"]], [3000, 5000, 6000, 8000])
+        self.assertEqual(r.data["fixtures"], 4)  # the most matches a variant can have today
         self.assertEqual((r.data["unlocked"], r.data["pending"]), ([], []))
 
     def test_unpaid_search_shows_masked_variants(self):
@@ -90,8 +91,21 @@ class CombinatorFlowTests(APITestCase):
         self.assertNotIn("body_text", offer)
         self.assertTrue(4.8 <= offer["combined_odds"] <= 5.3)
         self.assertEqual(self.search("combo_x10").data["results"], [])  # not reachable with this pool
-        for bad in ({"tier": "combo_x7"}, {"tier": "combo_x5", "max_legs": 1}):
+        for bad in ({"tier": "combo_x7", "legs": 3}, {"tier": "combo_x5", "legs": 0}, {"tier": "combo_x5"}):
             self.assertEqual(self.client.post("/api/combinator/search/", bad, format="json").status_code, 400, bad)
+        too_many = self.search(legs=5)  # only 4 matches today
+        self.assertEqual((too_many.status_code, too_many.json()["fixtures"]), (400, 4))
+
+    def test_exact_number_of_matches_any_tier(self):
+        """The number of matches is exact (not "up to"), and any tier can be one match if such odds exist."""
+        for legs in (2, 3, 4):
+            for v in self.search(legs=legs).data["results"]:
+                self.assertEqual(v["legs_count"], legs)
+        self.assertEqual(self.search(legs=2).data["results"], [])  # x5 can't be made from two of these picks
+        self.assertEqual(self.search("combo_x20", legs=1).data["results"], [])
+        SelectionCandidate.objects.create(fixture_name="X - Y", market="MATCH_WINNER", selection="Y (Away Win)", odd=20.0)
+        single = self.search("combo_x20", legs=1).data["results"]
+        self.assertEqual([(v["legs_count"], v["combined_odds"]) for v in single], [(1, 20.0)])
 
     def test_open_to_every_logged_in_user(self):
         """The combinator is no longer VIP-only: any signed-in user can search and buy a tier."""
@@ -193,7 +207,7 @@ class N8nCombinatorPoolTests(APITestCase):
         )
         self.assertEqual(self.client.get("/api/combinator/pool/").data["count"], 2)
 
-        r = self.client.post("/api/combinator/search/", {"tier": "combo_x5", "max_legs": 3}, format="json")
+        r = self.client.post("/api/combinator/search/", {"tier": "combo_x5", "legs": 2}, format="json")
         self.assertEqual(r.status_code, 200, r.data)
 
     def test_invalid_payload(self):

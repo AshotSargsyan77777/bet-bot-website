@@ -6,20 +6,21 @@ import { CheckPreview } from "../components/stats/CheckPreview";
 import { useDebouncedValue } from "../hooks/useDebouncedValue";
 import { useT, usePkgLabel, type Key } from "../i18n";
 
-const LEGS_KEY = "combinator.maxLegs";
+const LEGS_KEY = "combinator.legs";
 
-/** The "up to N matches" choice is remembered in this browser (page reloads, coming back after paying). */
-function savedMaxLegs(): string {
+/** The chosen number of matches is remembered in this browser (page reloads, coming back after paying). */
+function savedLegs(): string {
   try {
-    return localStorage.getItem(LEGS_KEY) || "7";
+    return localStorage.getItem(LEGS_KEY) || "3";
   } catch {
-    return "7";
+    return "3";
   }
 }
 
 type Tier = { key: string; label: string; price: number; min: number; max: number };
 type PoolInfo = {
   count: number;
+  fixtures: number; // matches available today = the most matches a variant can have
   tiers: Tier[];
   unlocked: string[];
   pending: string[];
@@ -111,7 +112,8 @@ export function Combinator() {
   });
 
   const [tierKey, setTierKey] = useState("combo_x10");
-  const [maxLegs, setMaxLegs] = useState(savedMaxLegs);
+  const [maxLegs, setMaxLegs] = useState(savedLegs);
+  const maxFixtures = pool.data?.fixtures ?? 0;
   const debouncedLegs = useDebouncedValue(maxLegs, 500);
   const [formError, setFormError] = useState("");
 
@@ -120,12 +122,15 @@ export function Combinator() {
 
   const search = useMutation({
     mutationFn: (p: { tier: string; legs: number }) =>
-      api<SearchResponse>("/api/combinator/search/", { method: "POST", json: { tier: p.tier, max_legs: p.legs } }),
+      api<SearchResponse>("/api/combinator/search/", { method: "POST", json: { tier: p.tier, legs: p.legs } }),
   });
 
   const run = (key = tierKey, legsS = maxLegs) => {
     const legs = parseInt(legsS, 10);
-    const err = !Number.isFinite(legs) || legs < 2 || legs > 12 ? t("comb.legsError") : "";
+    const err =
+      !Number.isFinite(legs) || legs < 1 || (maxFixtures > 0 && legs > maxFixtures)
+        ? t("comb.legsError", { max: maxFixtures || 1 })
+        : "";
     setFormError(err);
     if (!err) search.mutate({ tier: key, legs });
   };
@@ -193,7 +198,8 @@ export function Combinator() {
           <div className="grid" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", alignItems: "end" }}>
             <div className="field">
               <span className="field__label">{t("comb.maxGames")}</span>
-              <input type="number" min={2} max={12} value={maxLegs} onChange={(e) => setMaxLegs(e.target.value)} />
+              <input type="number" min={1} max={maxFixtures || undefined} value={maxLegs} onChange={(e) => setMaxLegs(e.target.value)} />
+              {maxFixtures > 0 && <span className="field__hint">{t("comb.fixturesToday", { n: maxFixtures })}</span>}
             </div>
           </div>
           <div className="filters-toolbar" style={{ marginTop: "1rem" }}>

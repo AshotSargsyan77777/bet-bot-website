@@ -25,10 +25,11 @@ MARKETS = [
 
 
 class ComboSearchSerializer(serializers.Serializer):
-    """VIP combinator: a paid tier (fixed total odds range) and the maximum number of games."""
+    """Combinator: a paid tier (fixed total odds range) and the exact number of matches.
+    The upper limit is the number of matches available today (checked in the view)."""
 
     tier = serializers.ChoiceField(choices=list(COMBO_TIERS))
-    max_legs = serializers.IntegerField(min_value=2, max_value=12, default=7)
+    legs = serializers.IntegerField(min_value=1, max_value=60)
 
 
 class ComboOrderCreateSerializer(serializers.Serializer):

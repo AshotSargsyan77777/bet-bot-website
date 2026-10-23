@@ -3,7 +3,7 @@ from typing import Any
 
 from apps.checks.services.formatting import explain_selection
 
-MAX_CANDIDATES = 100
+MAX_CANDIDATES = 300
 MAX_RESULTS = 20
 TIMEOUT_SEC = 2.0
 
@@ -96,6 +96,10 @@ def search_combinations(
 
     if len(filtered) > MAX_CANDIDATES:
         filtered = filtered[:MAX_CANDIDATES]
+    # most likely picks first: the first variants found (before the time limit) are the best ones
+    filtered.sort(key=lambda c: -(c.get("probability") or 0))
+    odd_lo = min((c["odd"] for c in filtered), default=1.0)
+    odd_hi = max((c["odd"] for c in filtered), default=1.0)
 
     if legs_count is not None:
         k_min = k_max = legs_count
@@ -134,6 +138,11 @@ def search_combinations(
                     "hit_chance": round(chance, 4) if chance is not None else None,
                 })
         if n >= k_max:
+            return
+        left = k_max - n
+        if product * odd_hi ** left < target_min:  # even the highest odds can't reach the target
+            return
+        if product * odd_lo ** max(k_min - n, 0) > target_max:  # even the lowest odds overshoot
             return
         used_fixtures = {_fixture_key(c) for c in chosen}
         for i in range(start_idx, len(filtered)):

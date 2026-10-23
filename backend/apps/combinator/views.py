@@ -17,7 +17,7 @@ from apps.checks.services.formatting import format_package
 from apps.checks.services.time import yerevan_today
 from apps.combinator.models import ComboOrder
 from apps.combinator.pool import todays_selections
-from apps.combinator.search import build_candidate_pool, search_combinations
+from apps.combinator.search import _fixture_key, build_candidate_pool, search_combinations
 from apps.combinator.serializers import (
     ComboOrderCreateSerializer,
     ComboOrderSerializer,
@@ -28,9 +28,9 @@ from apps.games.models import FixtureCache
 
 logger = logging.getLogger(__name__)
 
-MAX_POOL = 120
+MAX_POOL = 320
 MAX_OFFERS = 10
-LEG_ODDS_MIN, LEG_ODDS_MAX = 1.1, 3.0  # single pick odds used by the combinator
+LEG_ODDS_MIN = 1.1  # the highest single-pick odds is the tier's own maximum (so even x20 with one match)
 
 
 class CombinatorThrottle(SimpleRateThrottle):
@@ -104,6 +104,7 @@ class CombinatorPoolView(APIView):
         return Response(
             {
                 "count": len(pool),
+                "fixtures": fixtures_in(pool),  # the most matches a variant can have today
                 "tiers": _tiers_payload(),
                 "unlocked": sorted(unlocked),
                 "pending": sorted(pending),
@@ -131,14 +132,19 @@ class CombinatorSearchView(APIView):
                 {"error": "too many candidates; narrow filters or wait for smaller pool", "code": "pool_too_large"},
                 status=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
             )
+        available = fixtures_in(pool)
+        if params["legs"] > available:
+            return Response(
+                {"error": f"Այսօր հասանելի է ընդամենը {available} խաղ", "code": "too_many_legs", "fixtures": available},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
         result = search_combinations(
             pool,
             target_min=tier["min"],
             target_max=tier["max"],
-            legs_min=2,
-            legs_max=params["max_legs"],
+            legs_count=params["legs"],
             leg_odds_min=LEG_ODDS_MIN,
-            leg_odds_max=LEG_ODDS_MAX,
+            leg_odds_max=tier["max"],
             max_results=MAX_OFFERS,
         )
         unlocked, pending = tier_access(request.user, yerevan_today())
@@ -166,6 +172,10 @@ class CombinatorSearchView(APIView):
                 "timed_out": result["timed_out"],
             }
         )
+
+
+def fixtures_in(pool: list[dict]) -> int:
+    return len({_fixture_key(c) for c in pool})
 
 
 def _selection(leg: dict) -> dict:
