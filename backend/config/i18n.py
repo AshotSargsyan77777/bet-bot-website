@@ -68,6 +68,7 @@ MESSAGES: dict[str, tuple[str, str]] = {
         "The link is invalid or expired, request a new one",
         "Ссылка недействительна или устарела, запросите новую",
     ),
+    "Նշեք email հասցե": ("Enter an email address", "Укажите email"),
     "Խաղն արդեն սկսվել է": ("The match has already started", "Матч уже начался"),
     "Այս վերլուծությունը արդեն գնված է կամ սպասում է հաստատման": (
         "This analysis is already bought or awaiting approval",

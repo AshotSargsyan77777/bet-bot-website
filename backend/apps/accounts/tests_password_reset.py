@@ -67,3 +67,30 @@ class PasswordResetTests(APITestCase):
     def test_throttled(self):
         codes = [self.request_reset("nobody")[0].status_code for _ in range(6)]
         self.assertEqual(codes[-1], 429)
+
+
+class AdminTestEmailTests(APITestCase):
+    def setUp(self):
+        self.admin = User.objects.create_user("boss", "boss@example.com", "x", is_staff=True)
+        self.client.force_authenticate(self.admin)
+
+    @override_settings(BREVO_API_KEY="", EMAIL_FROM="")
+    def test_reports_missing_settings(self):
+        r = self.client.post("/api/admin/test-email/", {}, format="json")
+        self.assertEqual(r.status_code, 400)
+        self.assertIn("BREVO_API_KEY, EMAIL_FROM", r.json()["error"])
+
+    @override_settings(BREVO_API_KEY="bad", EMAIL_FROM="noreply@example.com")
+    def test_shows_brevo_error_and_success(self):
+        with mock.patch("apps.accounts.password_reset.requests.post") as post:
+            post.return_value.status_code = 401
+            post.return_value.json.return_value = {"code": "unauthorized", "message": "Key not found"}
+            r = self.client.post("/api/admin/test-email/", {"to": "me@example.com"}, format="json")
+            self.assertEqual(r.json()["error"], "Brevo HTTP 401: Key not found")
+            post.return_value.status_code = 201
+            r = self.client.post("/api/admin/test-email/", {}, format="json")
+        self.assertEqual(r.json(), {"ok": True, "to": "boss@example.com"})
+
+    def test_admin_only(self):
+        self.client.force_authenticate(User.objects.create_user("u", "u@example.com", "x"))
+        self.assertEqual(self.client.post("/api/admin/test-email/", {}, format="json").status_code, 403)

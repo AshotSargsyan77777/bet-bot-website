@@ -4,6 +4,7 @@ from django.http import FileResponse, Http404, HttpResponse
 from django.urls import path, re_path
 
 from apps.accounts.views import (
+    AdminTestEmailView,
     ChangePasswordView,
     PasswordResetConfirmView,
     PasswordResetRequestView,
@@ -100,6 +101,7 @@ urlpatterns = [
     path("api/admin/payments/<int:payment_id>/receipt/", AdminPaymentReceiptView.as_view()),
     path("api/admin/promo/", AdminPromoView.as_view()),
     path("api/admin/stats/", AdminStatsView.as_view()),
+    path("api/admin/test-email/", AdminTestEmailView.as_view()),
     path("api/admin/revenue/", AdminRevenueView.as_view()),
     path("api/admin/records/", AdminRecordsView.as_view()),
     path("api/admin/records/<int:pk>/", AdminRecordDetailView.as_view()),

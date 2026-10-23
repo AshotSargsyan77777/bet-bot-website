@@ -422,6 +422,10 @@ export const hy = {
   "reset.save": "Պահպանել գաղտնաբառը",
   "reset.done": "✅ Գաղտնաբառը փոխված է։ Մուտք գործեք որպես «{username}»։",
   "reset.requestNew": "Խնդրել նոր հղում",
+  "admin.emailTitle": "✉️ Email (գաղտնաբառի վերականգնում)",
+  "admin.emailHint": "Ստուգեք Brevo-ի կարգավորումը. ուղարկեք փորձնական նամակ։ Սխալի դեպքում կերևա Brevo-ի պատասխանը։",
+  "admin.emailSend": "Ուղարկել փորձնական email",
+  "admin.emailOk": "✅ Ուղարկվեց {to} հասցեին։ Ստուգեք նաև Spam թղթապանակը։",
 } as const;
 
 export type Key = keyof typeof hy;
