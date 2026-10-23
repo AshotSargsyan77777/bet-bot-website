@@ -135,6 +135,9 @@ AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "django.contrib.auth.password_validation.NumericPasswordValidator"},
 ]
 
+# Login with the username or the email (any letter case)
+AUTHENTICATION_BACKENDS = ["apps.accounts.backends.UsernameOrEmailBackend"]
+
 LANGUAGE_CODE = "hy"
 LANGUAGES = [("hy", "Հայերեն"), ("en", "English"), ("ru", "Русский")]
 TIME_ZONE = "Asia/Yerevan"

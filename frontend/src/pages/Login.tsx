@@ -1,4 +1,5 @@
 import { useCallback, useState } from "react";
+import { PasswordInput } from "../components/PasswordInput";
 import { Link, Navigate, useNavigate } from "react-router-dom";
 import { ApiError } from "../api/client";
 import { TelegramLoginButton, type TelegramUser } from "../components/TelegramLoginButton";
@@ -59,7 +60,7 @@ export function Login() {
         <h2 className="gradient-text">{mode === "login" ? t("login.titleLogin") : t("login.titleRegister")}</h2>
         <form onSubmit={submit}>
           <div className="field">
-            <span className="field__label">{t("login.username")}</span>
+            <span className="field__label">{mode === "login" ? t("login.username") : t("login.usernameRegister")}</span>
             <input
               value={username}
               onChange={(e) => setUsername(e.target.value)}
@@ -85,9 +86,7 @@ export function Login() {
           )}
           <label>
             {t("login.password")}
-            <input
-              type="password"
-              value={password}
+            <PasswordInput value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
               minLength={mode === "register" ? 8 : undefined}

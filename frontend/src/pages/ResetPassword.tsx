@@ -1,4 +1,5 @@
 import { useMutation } from "@tanstack/react-query";
+import { PasswordInput } from "../components/PasswordInput";
 import { useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { api } from "../api/client";
@@ -47,11 +48,11 @@ export function ResetPassword() {
           >
             <label>
               {t("status.newPassword")}
-              <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required minLength={8} autoComplete="new-password" />
+              <PasswordInput value={password} onChange={(e) => setPassword(e.target.value)} required minLength={8} autoComplete="new-password" />
             </label>
             <label style={{ display: "block", marginTop: "0.75rem" }}>
               {t("reset.repeat")}
-              <input type="password" value={repeat} onChange={(e) => setRepeat(e.target.value)} required minLength={8} autoComplete="new-password" />
+              <PasswordInput value={repeat} onChange={(e) => setRepeat(e.target.value)} required minLength={8} autoComplete="new-password" />
             </label>
             <p className="field__hint">{t("login.passwordHint")}</p>
             {err && <p className="field__error">{err}</p>}

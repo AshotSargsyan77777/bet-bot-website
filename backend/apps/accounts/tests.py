@@ -124,3 +124,33 @@ class ApiLanguageTests(APITestCase):
         self.assertIn("username-ը արդեն", self.register(**own)["error"])
         self.assertIn("already exists", self.register("en", **own)["error"])
         self.assertIn("уже существует", self.register("ru-RU,ru;q=0.9", **own)["fields"]["username"][0])
+
+
+class LoginWithEmailTests(APITestCase):
+    def setUp(self):
+        cache.clear()
+        User.objects.create_user("Ashot", "ashot@example.com", "Str0ng!Passw0rd")
+
+    def tearDown(self):
+        cache.clear()
+
+    def login(self, username, password="Str0ng!Passw0rd"):
+        return self.client.post("/api/auth/token/", {"username": username, "password": password}, format="json")
+
+    def test_username_or_email_any_case(self):
+        for login in ("Ashot", "ashot", "ASHOT", "ashot@example.com", "Ashot@Example.com", "  ashot  "):
+            self.assertEqual(self.login(login).status_code, 200, login)
+        self.assertEqual(self.login("ashot@example.com", "wrong").status_code, 401)
+        self.assertEqual(self.login("nobody@example.com").status_code, 401)
+
+    def test_exact_username_wins_and_ambiguous_email_is_refused(self):
+        # a username may look like someone else's email
+        User.objects.create_user("ashot@example.com", "other@example.com", "Other!Passw0rd")
+        self.assertEqual(self.login("ashot@example.com", "Other!Passw0rd").status_code, 200)
+        User.objects.create_user("twin", "same@example.com", "Twin!Passw0rd1")
+        User.objects.create_user("twin2", "same@example.com", "Twin!Passw0rd1")
+        self.assertEqual(self.login("same@example.com", "Twin!Passw0rd1").status_code, 401)
+
+    def test_inactive_user_cannot_log_in(self):
+        User.objects.filter(username="Ashot").update(is_active=False)
+        self.assertEqual(self.login("ashot@example.com").status_code, 401)

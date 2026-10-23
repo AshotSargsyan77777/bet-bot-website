@@ -106,7 +106,7 @@ export const ru: Record<Key, string> = {
 
   "login.titleLogin": "Вход в Goalking",
   "login.titleRegister": "Регистрация",
-  "login.username": "Имя пользователя (не email)",
+  "login.username": "Имя пользователя или email",
   "login.usernamePh": "напр. Ivan Petrov",
   "login.password": "Пароль",
   "login.passwordHint": "Минимум 8 символов, не только цифры и не слишком простой.",
@@ -408,4 +408,7 @@ export const ru: Record<Key, string> = {
   "admin.emailHint": "Проверьте настройку Brevo: отправьте тестовое письмо. При ошибке будет показан ответ Brevo.",
   "admin.emailSend": "Отправить тестовое письмо",
   "admin.emailOk": "✅ Отправлено на {to}. Проверьте и папку «Спам».",
+  "login.showPassword": "Показать пароль",
+  "login.hidePassword": "Скрыть пароль",
+  "login.usernameRegister": "Имя пользователя",
 };
