@@ -94,6 +94,11 @@ export function Login() {
               autoComplete={mode === "login" ? "current-password" : "new-password"}
             />
           </label>
+          {mode === "login" && (
+            <p style={{ textAlign: "right", marginTop: "0.5rem" }}>
+              <Link to="/forgot-password" className="muted" style={{ fontSize: "0.85rem" }}>{t("reset.forgot")}</Link>
+            </p>
+          )}
           {error && <p className="field__error">{error}</p>}
           {mode === "register" && (
             <p className="field__hint">{t("login.passwordHint")}</p>

@@ -97,6 +97,16 @@ class ChangePasswordSerializer(serializers.Serializer):
         return value
 
 
+class PasswordResetRequestSerializer(serializers.Serializer):
+    login = serializers.CharField(max_length=254)  # username or email
+
+
+class PasswordResetConfirmSerializer(serializers.Serializer):
+    uid = serializers.CharField(max_length=64)
+    token = serializers.CharField(max_length=128)
+    new_password = serializers.CharField(write_only=True, min_length=8, max_length=128)
+
+
 class TelegramAuthSerializer(serializers.Serializer):
     """Payload of the Telegram Login Widget callback."""
 

@@ -64,6 +64,10 @@ MESSAGES: dict[str, tuple[str, str]] = {
     ),
     "Խաղը չի գտնվել": ("Match not found", "Матч не найден"),
     "Վիճակագրությունը ժամանակավորապես անհասանելի է": ("Statistics are temporarily unavailable", "Статистика временно недоступна"),
+    "Հղումը անվավեր է կամ ժամկետանց, խնդրեք նորը": (
+        "The link is invalid or expired, request a new one",
+        "Ссылка недействительна или устарела, запросите новую",
+    ),
     "Խաղն արդեն սկսվել է": ("The match has already started", "Матч уже начался"),
     "Այս վերլուծությունը արդեն գնված է կամ սպասում է հաստատման": (
         "This analysis is already bought or awaiting approval",

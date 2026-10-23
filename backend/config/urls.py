@@ -5,6 +5,8 @@ from django.urls import path, re_path
 
 from apps.accounts.views import (
     ChangePasswordView,
+    PasswordResetConfirmView,
+    PasswordResetRequestView,
     LoginView,
     LogoutView,
     MeView,
@@ -67,6 +69,8 @@ urlpatterns = [
     path("api/auth/token/refresh/", RefreshView.as_view()),
     path("api/auth/logout/", LogoutView.as_view()),
     path("api/auth/password/", ChangePasswordView.as_view()),
+    path("api/auth/password-reset/", PasswordResetRequestView.as_view()),
+    path("api/auth/password-reset/confirm/", PasswordResetConfirmView.as_view()),
     path("api/auth/telegram/", TelegramLoginView.as_view()),
     path("api/me/telegram/", TelegramLinkView.as_view()),
     path("api/config/", PublicConfigView.as_view()),
