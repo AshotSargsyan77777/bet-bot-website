@@ -1,7 +1,11 @@
+import logging
 import secrets
 
 from django.conf import settings
 from django.contrib.auth import get_user_model
+from django.contrib.auth.password_validation import validate_password
+from django.contrib.auth.tokens import default_token_generator
+from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import IntegrityError, transaction
 from rest_framework import generics, permissions, status
 from rest_framework.response import Response
@@ -12,8 +16,11 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 
 from .models import TelegramAccount
+from .password_reset import find_user, send_reset, user_from_uid
 from .serializers import (
     ChangePasswordSerializer,
+    PasswordResetConfirmSerializer,
+    PasswordResetRequestSerializer,
     RegisterSerializer,
     TelegramAuthSerializer,
     TelegramSettingsSerializer,
@@ -22,6 +29,7 @@ from .serializers import (
 from .telegram import TelegramAuthError, verify_login
 
 User = get_user_model()
+logger = logging.getLogger(__name__)
 
 
 class AuthThrottleMixin:
@@ -75,6 +83,60 @@ class ChangePasswordView(AuthThrottleMixin, APIView):
         request.user.set_password(serializer.validated_data["new_password"])
         request.user.save(update_fields=["password"])
         return Response({"ok": True})
+
+
+class PasswordResetRequestView(APIView):
+    """Sends a reset link to the account's Telegram and/or email. The answer is the same whether or not
+    the account exists, so it cannot be used to find out who is registered."""
+
+    permission_classes = (permissions.AllowAny,)
+    authentication_classes = ()
+    throttle_classes = (ScopedRateThrottle,)
+    throttle_scope = "password_reset"
+
+    def post(self, request):
+        serializer = PasswordResetRequestSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        user = find_user(serializer.validated_data["login"])
+        if user:
+            channels = send_reset(user)
+            logger.info("Password reset for user %s sent via %s", user.pk, ",".join(channels) or "nothing")
+        return Response({"ok": True})
+
+
+class PasswordResetConfirmView(AuthThrottleMixin, APIView):
+    permission_classes = (permissions.AllowAny,)
+    authentication_classes = ()
+
+    def post(self, request):
+        serializer = PasswordResetConfirmSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+        user = user_from_uid(data["uid"])
+        if not user or not default_token_generator.check_token(user, data["token"]):
+            return Response(
+                {"error": "Հղումը անվավեր է կամ ժամկետանց, խնդրեք նորը", "code": "invalid_token"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        try:
+            validate_password(data["new_password"], user=user)
+        except DjangoValidationError as e:
+            return Response(
+                {"error": e.messages[0], "code": "invalid", "fields": {"new_password": e.messages}},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        user.set_password(data["new_password"])
+        user.save(update_fields=["password"])  # also invalidates the reset link (it depends on the password)
+        _logout_everywhere(user)
+        return Response({"ok": True, "username": user.username})
+
+
+def _logout_everywhere(user) -> None:
+    """After a reset, sessions opened with the old password must not keep working."""
+    from rest_framework_simplejwt.token_blacklist.models import BlacklistedToken, OutstandingToken
+
+    for token in OutstandingToken.objects.filter(user=user):
+        BlacklistedToken.objects.get_or_create(token=token)
 
 
 class PublicConfigView(APIView):

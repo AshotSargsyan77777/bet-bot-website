@@ -6,6 +6,8 @@ import { Layout } from "./components/Layout";
 import { PageHeader } from "./components/PageHeader";
 import { Home } from "./pages/Home";
 import { Login } from "./pages/Login";
+import { ForgotPassword } from "./pages/ForgotPassword";
+import { ResetPassword } from "./pages/ResetPassword";
 import { Checks } from "./pages/Checks";
 import { Pay } from "./pages/Pay";
 import { Status } from "./pages/Status";
@@ -71,6 +73,8 @@ export default function App() {
         <BrowserRouter>
           <Routes>
             <Route path="/login" element={<Login />} />
+            <Route path="/forgot-password" element={<ForgotPassword />} />
+            <Route path="/reset-password" element={<ResetPassword />} />
             <Route element={<Layout />}>
               <Route index element={<Home />} />
               <Route path="checks" element={<Checks />} />

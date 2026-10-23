@@ -181,6 +181,7 @@ REST_FRAMEWORK = {
         "anon": os.environ.get("THROTTLE_ANON", "600/hour"),
         "user": os.environ.get("THROTTLE_USER", "3000/hour"),
         "auth": os.environ.get("THROTTLE_AUTH", "20/minute"),
+        "password_reset": os.environ.get("THROTTLE_PASSWORD_RESET", "5/hour"),
         "promo": os.environ.get("THROTTLE_PROMO", "10/minute"),
         "support": os.environ.get("THROTTLE_SUPPORT", "20/hour"),
         "combinator": os.environ.get("THROTTLE_COMBINATOR", "30/hour"),
@@ -251,6 +252,11 @@ API_FOOTBALL_KEY = os.environ.get("API_FOOTBALL_KEY", "")
 TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "")
 TELEGRAM_BOT_USERNAME = os.environ.get("TELEGRAM_BOT_USERNAME", "").lstrip("@")
 TELEGRAM_ASYNC = env_bool("TELEGRAM_ASYNC", True)
+# Password reset links (sent via Telegram and/or email); email goes through Brevo's HTTP API
+PASSWORD_RESET_TIMEOUT = int(os.environ.get("PASSWORD_RESET_TIMEOUT", "3600"))
+BREVO_API_KEY = os.environ.get("BREVO_API_KEY", "")
+EMAIL_FROM = os.environ.get("EMAIL_FROM", "")
+EMAIL_FROM_NAME = os.environ.get("EMAIL_FROM_NAME", "Goalking")
 SITE_URL = os.environ.get("SITE_URL", "") or (f"https://{RAILWAY_PUBLIC_DOMAIN}" if RAILWAY_PUBLIC_DOMAIN else "")
 # Leagues shown on the site (same as the bot / n8n workflow): top 5, UCL, UEL, UECL, World Cup, Euro, Nations League.
 # Order = order in the league filter. Empty = all leagues.
