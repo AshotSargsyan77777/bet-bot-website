@@ -3,13 +3,12 @@ import logging
 from django.conf import settings
 from django.db import transaction
 from django.utils import timezone
-from rest_framework import generics, status
+from rest_framework import generics, permissions, status
 from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.response import Response
 from rest_framework.throttling import SimpleRateThrottle
 from rest_framework.views import APIView
 
-from apps.accounts.permissions import IsVipMember
 from apps.accounts.permissions import user_is_admin
 from apps.checks.constants import COMBO_TIERS
 from apps.checks.models import AppSettings, DailyCheck
@@ -97,7 +96,7 @@ def _tiers_payload() -> list[dict]:
 class CombinatorPoolView(APIView):
     """How many picks are available today, the paid tiers and which of them this user has unlocked."""
 
-    permission_classes = (IsVipMember,)
+    permission_classes = (permissions.IsAuthenticated,)
 
     def get(self, request):
         pool = current_pool()
@@ -117,7 +116,7 @@ class CombinatorPoolView(APIView):
 class CombinatorSearchView(APIView):
     """Today's variants for a tier. Picks are shown only once the tier is paid for today (or to admins)."""
 
-    permission_classes = (IsVipMember,)
+    permission_classes = (permissions.IsAuthenticated,)
     throttle_classes = (CombinatorThrottle,)
 
     def post(self, request):
@@ -184,7 +183,7 @@ def _selection(leg: dict) -> dict:
 class ComboOrderListCreateView(generics.ListAPIView):
     """GET: my combinator purchases · POST: pay for a tier; once approved, all of today's variants open."""
 
-    permission_classes = (IsVipMember,)
+    permission_classes = (permissions.IsAuthenticated,)
     serializer_class = ComboOrderSerializer
     parser_classes = (MultiPartParser, FormParser, JSONParser)
 

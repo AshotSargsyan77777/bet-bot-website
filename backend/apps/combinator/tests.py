@@ -93,11 +93,15 @@ class CombinatorFlowTests(APITestCase):
         for bad in ({"tier": "combo_x7"}, {"tier": "combo_x5", "max_legs": 1}):
             self.assertEqual(self.client.post("/api/combinator/search/", bad, format="json").status_code, 400, bad)
 
-    def test_non_vip_forbidden(self):
+    def test_open_to_every_logged_in_user(self):
+        """The combinator is no longer VIP-only: any signed-in user can search and buy a tier."""
         other = User.objects.create_user("n", "n@example.com", "x")
         self.client.force_authenticate(other)
-        self.assertEqual(self.search().status_code, 403)
-        self.assertEqual(self.client.get("/api/combinator/orders/").status_code, 403)
+        self.assertEqual(self.search().status_code, 200)
+        self.assertEqual(self.buy().status_code, 201)
+        self.client.force_authenticate(None)
+        self.assertEqual(self.search().status_code, 401)
+        self.assertEqual(self.client.get("/api/combinator/pool/").status_code, 401)
 
     def test_paying_for_a_tier_opens_all_its_variants(self):
         # a pending package payment must survive a combinator purchase

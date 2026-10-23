@@ -98,7 +98,7 @@ export const en: Record<Key, string> = {
   "home.viewCatalog": "View catalogue",
   "home.sample": "⚽ GOALKING CHECK\n🎯 Total odds: 3.12x\n━━━━━━━━━━━━━━\n\n1️⃣ 🏟 Team A - Team B\n🏆 Team A (Home Win)\n💰 Odds: 1.60\n💡 Team A is in better form in recent matches.\n\n2️⃣ 🏟 Team C - Team D\n🥅 Both Teams To Score — Yes\n💰 Odds: 1.95\n\n━━━━━━━━━━━━━━",
   "home.combTitle": "Combinator",
-  "home.combDesc": "VIP members choose the odds they want (x5–x20) and, after paying, see all of the day's variants.",
+  "home.combDesc": "Choose the odds you want (x5–x20) and, after paying, see all of the day's variants.",
   "home.openCombinator": "Open the combinator",
   "home.ctaTitle": "Ready to start?",
   "home.ctaText": "Sign up, pick a package and get today's check after approval.",
@@ -146,7 +146,7 @@ export const en: Record<Key, string> = {
   "promo.checking": "Checking…",
   "promo.activate": "Activate",
 
-  "vip.subtitle": "Exclusive Telegram link + combinator",
+  "vip.subtitle": "Exclusive Telegram link",
   "vip.link": "🎉 Your VIP link:",
   "vip.noLink": "🎉 You are VIP. Write to support to get the link.",
   "vip.desc": "Access to the VIP group — approved by an admin after payment",

@@ -29,7 +29,6 @@ export function Vip() {
             ) : (
               <p><Link to="/help">{t("vip.noLink")}</Link></p>
             )}
-            <Link to="/combinator" className="btn" style={{ marginTop: "1rem", display: "inline-block" }}>{t("home.ctaCombinator")}</Link>
           </>
         ) : vip.data ? (
           <>

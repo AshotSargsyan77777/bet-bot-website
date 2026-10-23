@@ -24,6 +24,18 @@ class YerevanTodayTests(SimpleTestCase):
     def test_format_yyyy_mm_dd(self):
         self.assertRegex(yerevan_today(), r"^\d{4}-\d{2}-\d{2}$")
 
+    def test_day_changes_at_yerevan_midnight(self):
+        """n8n posts the day's checks at 01:00 Yerevan; they must count as that day's (not yesterday's)."""
+        from datetime import datetime, timezone
+        from unittest import mock
+
+        for utc, expected in (("2026-10-22T20:59:00", "2026-10-23"), ("2026-10-22T19:59:00", "2026-10-22"),
+                              ("2026-10-22T21:10:00", "2026-10-23")):
+            now = datetime.fromisoformat(utc).replace(tzinfo=timezone.utc)
+            with mock.patch("apps.checks.services.time.datetime") as dt:
+                dt.now.side_effect = lambda tz: now.astimezone(tz)
+                self.assertEqual(yerevan_today(), expected, utc)
+
 
 class FormatPackageTests(SimpleTestCase):
     def test_minimal_package(self):

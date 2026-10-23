@@ -65,7 +65,7 @@ class CheckRecord(models.Model):
     STATUS_CHOICES = [(STATUS_PENDING, "pending"), (STATUS_WON, "won"), (STATUS_LOST, "lost"), (STATUS_VOID, "void")]
 
     package_key = models.CharField(max_length=32, choices=[(k, k) for k in PACKAGES])
-    date = models.CharField(max_length=10, db_index=True)  # Yerevan "day" (02:00 boundary)
+    date = models.CharField(max_length=10, db_index=True)  # Yerevan calendar day
     content_hash = models.CharField(max_length=64)
     body_text = models.TextField()
     selections_json = models.JSONField(default=list, blank=True)

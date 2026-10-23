@@ -1,6 +1,6 @@
 import { BrowserRouter, Link, Navigate, Route, Routes } from "react-router-dom";
-import { QueryClient, QueryClientProvider, useQuery } from "@tanstack/react-query";
-import { api, ApiError } from "./api/client";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { ApiError } from "./api/client";
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import { Layout } from "./components/Layout";
 import { PageHeader } from "./components/PageHeader";
@@ -53,20 +53,6 @@ function AdminOnly({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
-function VipOnly({ children }: { children: React.ReactNode }) {
-  const { user, loading } = useAuth();
-  // Fresh VIP status (it changes when an admin approves a VIP payment).
-  const vip = useQuery({
-    queryKey: ["vip", user?.id],
-    queryFn: () => api<{ is_vip: boolean }>("/api/vip/status/"),
-    enabled: !!user,
-  });
-  if (loading || (user && vip.isLoading)) return <div className="loading-shimmer" />;
-  if (!user) return <Navigate to="/login" replace />;
-  if (!vip.data?.is_vip && !user.is_admin) return <Navigate to="/vip" replace />;
-  return <>{children}</>;
-}
-
 function NotFound() {
   const { t } = useT();
   return (
@@ -99,7 +85,7 @@ export default function App() {
               <Route path="admin" element={<AdminOnly><Admin /></AdminOnly>} />
               <Route path="games" element={<Games />} />
               <Route path="games/:id" element={<GameDetail />} />
-              <Route path="combinator" element={<VipOnly><Combinator /></VipOnly>} />
+              <Route path="combinator" element={<Private><Combinator /></Private>} />
               <Route path="*" element={<NotFound />} />
             </Route>
           </Routes>

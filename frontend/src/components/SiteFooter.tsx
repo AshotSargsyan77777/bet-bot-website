@@ -1,7 +1,7 @@
 import { Link } from "react-router-dom";
 import { useT } from "../i18n";
 
-export function SiteFooter({ showCombinator = false }: { showCombinator?: boolean }) {
+export function SiteFooter() {
   const { t } = useT();
   return (
     <footer className="site-footer">
@@ -15,7 +15,7 @@ export function SiteFooter({ showCombinator = false }: { showCombinator?: boolea
           <Link to="/games?analysis=1">{t("nav.analysis")}</Link>
           <Link to="/results">{t("nav.results")}</Link>
           <Link to="/games">{t("nav.games")}</Link>
-          {showCombinator && <Link to="/combinator">{t("nav.combinator")}</Link>}
+          <Link to="/combinator">{t("nav.combinator")}</Link>
           <Link to="/vip">VIP</Link>
           <Link to="/help">Support</Link>
         </div>
