@@ -5,6 +5,8 @@ from django.urls import path, re_path
 
 from apps.accounts.views import (
     AdminTestEmailView,
+    AdminUserDetailView,
+    AdminUsersView,
     ChangePasswordView,
     PasswordResetConfirmView,
     PasswordResetRequestView,
@@ -102,6 +104,8 @@ urlpatterns = [
     path("api/admin/promo/", AdminPromoView.as_view()),
     path("api/admin/stats/", AdminStatsView.as_view()),
     path("api/admin/test-email/", AdminTestEmailView.as_view()),
+    path("api/admin/admins/", AdminUsersView.as_view()),
+    path("api/admin/admins/<int:pk>/", AdminUserDetailView.as_view()),
     path("api/admin/revenue/", AdminRevenueView.as_view()),
     path("api/admin/records/", AdminRecordsView.as_view()),
     path("api/admin/records/<int:pk>/", AdminRecordDetailView.as_view()),

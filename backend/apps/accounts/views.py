@@ -7,6 +7,7 @@ from django.contrib.auth.password_validation import validate_password
 from django.contrib.auth.tokens import default_token_generator
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import IntegrityError, transaction
+from django.db.models import Q
 from rest_framework import generics, permissions, status
 from rest_framework.response import Response
 from rest_framework.throttling import ScopedRateThrottle
@@ -138,6 +139,55 @@ def _logout_everywhere(user) -> None:
 
     for token in OutstandingToken.objects.filter(user=user):
         BlacklistedToken.objects.get_or_create(token=token)
+
+
+def _admin_row(u) -> dict:
+    tg = getattr(u, "telegram", None) if hasattr(u, "telegram") else None
+    return {
+        "id": u.id,
+        "username": u.username,
+        "email": u.email,
+        "is_superuser": u.is_superuser,
+        "telegram": tg.username if tg else "",
+    }
+
+
+class AdminUsersView(APIView):
+    """Admin panel: list admins and grant admin rights to an existing account (by username or email)."""
+
+    permission_classes = (IsAdminUser,)
+
+    def get(self, request):
+        admins = User.objects.filter(Q(is_staff=True) | Q(is_superuser=True), is_active=True).select_related("telegram")
+        return Response({"results": [_admin_row(u) for u in admins.order_by("date_joined")]})
+
+    def post(self, request):
+        login = str(request.data.get("login") or "").strip()
+        user = find_user(login) if login else None
+        if not user:
+            return Response({"error": "Այդպիսի օգտատեր չի գտնվել", "code": "not_found"}, status=status.HTTP_404_NOT_FOUND)
+        if not user.is_staff:
+            user.is_staff = True
+            user.save(update_fields=["is_staff"])
+            logger.info("Admin %s granted admin rights to %s", request.user.username, user.username)
+        return Response(_admin_row(user), status=status.HTTP_201_CREATED)
+
+
+class AdminUserDetailView(APIView):
+    permission_classes = (IsAdminUser,)
+
+    def delete(self, request, pk: int):
+        user = User.objects.filter(pk=pk).first()
+        if not user:
+            return Response({"error": "Այդպիսի օգտատեր չի գտնվել", "code": "not_found"}, status=status.HTTP_404_NOT_FOUND)
+        if user.pk == request.user.pk:
+            return Response({"error": "Չեք կարող հանել ձեր սեփական ադմինի իրավունքը", "code": "self"}, status=status.HTTP_400_BAD_REQUEST)
+        if user.is_superuser:
+            return Response({"error": "Գլխավոր ադմինին այստեղից հանել հնարավոր չէ", "code": "superuser"}, status=status.HTTP_400_BAD_REQUEST)
+        user.is_staff = False
+        user.save(update_fields=["is_staff"])
+        logger.info("Admin %s revoked admin rights of %s", request.user.username, user.username)
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 class AdminTestEmailView(APIView):

@@ -154,3 +154,34 @@ class LoginWithEmailTests(APITestCase):
     def test_inactive_user_cannot_log_in(self):
         User.objects.filter(username="Ashot").update(is_active=False)
         self.assertEqual(self.login("ashot@example.com").status_code, 401)
+
+
+class AdminManagementTests(APITestCase):
+    def setUp(self):
+        self.boss = User.objects.create_user("boss", "boss@example.com", "x", is_staff=True)
+        self.second = User.objects.create_user("Partner", "partner@example.com", "x")
+        self.client.force_authenticate(self.boss)
+
+    def test_grant_by_email_and_revoke(self):
+        r = self.client.post("/api/admin/admins/", {"login": "PARTNER@example.com"}, format="json")
+        self.assertEqual((r.status_code, r.data["username"]), (201, "Partner"))
+        # the new admin can open the admin API right away
+        self.client.force_authenticate(User.objects.get(username="Partner"))
+        self.assertEqual(self.client.get("/api/admin/stats/").status_code, 200)
+        self.assertTrue(self.client.get("/api/me/").data["is_admin"])
+        self.assertEqual(
+            sorted(a["username"] for a in self.client.get("/api/admin/admins/").data["results"]), ["Partner", "boss"]
+        )
+        self.client.force_authenticate(self.boss)
+        self.assertEqual(self.client.delete(f"/api/admin/admins/{self.second.id}/").status_code, 204)
+        self.second.refresh_from_db()
+        self.assertFalse(self.second.is_staff)
+
+    def test_guards(self):
+        self.assertEqual(self.client.post("/api/admin/admins/", {"login": "nobody"}, format="json").status_code, 404)
+        self.assertEqual(self.client.delete(f"/api/admin/admins/{self.boss.id}/").status_code, 400)  # not yourself
+        root = User.objects.create_superuser("root", "root@example.com", "x")
+        self.assertEqual(self.client.delete(f"/api/admin/admins/{root.id}/").status_code, 400)
+        self.client.force_authenticate(self.second)  # regular users can't do anything here
+        self.assertEqual(self.client.get("/api/admin/admins/").status_code, 403)
+        self.assertEqual(self.client.post("/api/admin/admins/", {"login": "Partner"}, format="json").status_code, 403)

@@ -411,4 +411,10 @@ export const en: Record<Key, string> = {
   "login.showPassword": "Show password",
   "login.hidePassword": "Hide password",
   "login.usernameRegister": "Username",
+  "admin.adminsTitle": "👥 Admins",
+  "admin.adminsHint": "The person must sign up on the site first; then enter their username or email. The new admin should reload the page (or log in again).",
+  "admin.makeAdmin": "Make admin",
+  "admin.adminAdded": "✅ {username} is now an admin",
+  "admin.removeAdmin": "Remove admin",
+  "admin.confirmRemoveAdmin": "Remove admin rights from {username}?",
 };
