@@ -209,11 +209,22 @@ for (const tier of ['standard', 'champions', 'europa', 'promo']) {
 }
 
 // ՆՈՐ: ընտրանքներ միայն կայքի կոնստրուկտորի համար (չեկերի վրա չեն ազդում, լրացուցիչ API հարցում չկա).
-// Ամեն խաղից լավագույն 3-ը՝ «relaxed» շեմերով և 1.10–3.00 գործակցով։
+// Ամեն խաղից լավագույն 3-ը՝ «relaxed» շեմերով և 1.10–3.00 գործակցով,
+// + մինչև 3 բարձր գործակցով ընտրանք (3–25), որ քիչ խաղով բարձր գործակից էլ կարելի լինի կազմել (օր. x20 մեկ խաղով)։
 const COMBINATOR_PER_FIXTURE = 3;
+const COMBINATOR_LONGSHOTS = 3;
 const comboStage = { ...STAGES[1], minOdd: 1.10, maxOdd: 3.00 };
-const combinatorSelections = buildGroups(pools.promo, comboStage)
-  .flatMap((g) => g.slice(0, COMBINATOR_PER_FIXTURE))
+const probablePicks = buildGroups(pools.promo, comboStage).flatMap((g) => g.slice(0, COMBINATOR_PER_FIXTURE));
+const longshotsByFixture = new Map();
+for (const c of pools.promo) {
+  if (!(c.odd > 3.0 && c.odd <= 25) || (c.dataQuality ?? 0) < 35) continue;
+  if (!longshotsByFixture.has(c.fixtureId)) longshotsByFixture.set(c.fixtureId, []);
+  longshotsByFixture.get(c.fixtureId).push(c);
+}
+const longshotPicks = [...longshotsByFixture.values()].flatMap((arr) =>
+  arr.sort((a, b) => b.probability - a.probability).slice(0, COMBINATOR_LONGSHOTS)
+);
+const combinatorSelections = [...probablePicks, ...longshotPicks]
   .map((s) => ({
     fixture: s.fixtureLabel, fixture_id: s.fixtureId, market: s.market, selection: s.selection,
     odd: s.odd, probability: s.probability, reasons: s.reasons,

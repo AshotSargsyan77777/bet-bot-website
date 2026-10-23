@@ -5,8 +5,8 @@ from django.utils import timezone
 
 from apps.combinator.models import CombinatorPool
 
-MAX_STORED = 200
-MAX_INCOMING = 300
+MAX_STORED = 300
+MAX_INCOMING = 400
 
 
 def _clean(s: dict) -> dict | None:
