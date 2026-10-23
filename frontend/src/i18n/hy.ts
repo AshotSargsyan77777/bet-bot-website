@@ -113,7 +113,7 @@ export const hy = {
   // login
   "login.titleLogin": "Մուտք Goalking",
   "login.titleRegister": "Գրանցում",
-  "login.username": "Օգտանուն (ոչ email)",
+  "login.username": "Օգտանուն կամ email",
   "login.usernamePh": "օր. Ashot Sargsyan",
   "login.password": "Գաղտնաբառ",
   "login.passwordHint": "Գաղտնաբառը՝ առնվազն 8 նիշ, ոչ միայն թվեր և ոչ շատ պարզ։",
@@ -426,6 +426,9 @@ export const hy = {
   "admin.emailHint": "Ստուգեք Brevo-ի կարգավորումը. ուղարկեք փորձնական նամակ։ Սխալի դեպքում կերևա Brevo-ի պատասխանը։",
   "admin.emailSend": "Ուղարկել փորձնական email",
   "admin.emailOk": "✅ Ուղարկվեց {to} հասցեին։ Ստուգեք նաև Spam թղթապանակը։",
+  "login.showPassword": "Ցույց տալ գաղտնաբառը",
+  "login.hidePassword": "Թաքցնել գաղտնաբառը",
+  "login.usernameRegister": "Օգտանուն",
 } as const;
 
 export type Key = keyof typeof hy;

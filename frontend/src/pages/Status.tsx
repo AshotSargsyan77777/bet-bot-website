@@ -1,4 +1,5 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
+import { PasswordInput } from "../components/PasswordInput";
 import { useCallback, useState } from "react";
 import { Link } from "react-router-dom";
 import { api, type Paginated } from "../api/client";
@@ -76,14 +77,14 @@ function ProfileCard() {
         {user?.has_password ? (
           <div className="field">
             <span className="field__label">{t("status.currentPassword")}</span>
-            <input type="password" value={current} onChange={(e) => setCurrent(e.target.value)} required autoComplete="current-password" />
+            <PasswordInput value={current} onChange={(e) => setCurrent(e.target.value)} required autoComplete="current-password" />
           </div>
         ) : (
           <p className="field__hint">{t("status.telegramNoPassword")}</p>
         )}
         <div className="field">
           <span className="field__label">{t("status.newPassword")}</span>
-          <input type="password" value={next} onChange={(e) => setNext(e.target.value)} required minLength={8} autoComplete="new-password" />
+          <PasswordInput value={next} onChange={(e) => setNext(e.target.value)} required minLength={8} autoComplete="new-password" />
         </div>
         {changePassword.isError && <p className="field__error">{changePassword.error.message}</p>}
         <button type="submit" className="secondary" disabled={changePassword.isPending}>

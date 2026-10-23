@@ -288,6 +288,37 @@ a:hover {
   transition: transform 0.2s, box-shadow 0.2s;
 }
 
+.password-input {
+  position: relative;
+  display: block;
+}
+
+.password-input input {
+  padding-right: 2.75rem;
+}
+
+.password-input__toggle {
+  position: absolute;
+  right: 0.35rem;
+  top: calc(50% + 0.175rem); /* inputs have a 0.35rem top margin */
+  transform: translateY(-50%);
+  width: auto;
+  margin: 0;
+  padding: 0.25rem 0.45rem;
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  font-size: 1.05rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.password-input__toggle:hover {
+  transform: translateY(-50%);
+  background: transparent;
+  box-shadow: none;
+}
+
 select.lang-switch {
   width: auto;
   margin-top: 0;

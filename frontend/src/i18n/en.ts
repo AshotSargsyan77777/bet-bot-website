@@ -106,7 +106,7 @@ export const en: Record<Key, string> = {
 
   "login.titleLogin": "Log in to Goalking",
   "login.titleRegister": "Sign up",
-  "login.username": "Username (not email)",
+  "login.username": "Username or email",
   "login.usernamePh": "e.g. John Smith",
   "login.password": "Password",
   "login.passwordHint": "At least 8 characters, not only digits and not too simple.",
@@ -408,4 +408,7 @@ export const en: Record<Key, string> = {
   "admin.emailHint": "Check the Brevo setup: send a test email. If it fails, Brevo's answer is shown.",
   "admin.emailSend": "Send test email",
   "admin.emailOk": "✅ Sent to {to}. Check the Spam folder too.",
+  "login.showPassword": "Show password",
+  "login.hidePassword": "Hide password",
+  "login.usernameRegister": "Username",
 };
