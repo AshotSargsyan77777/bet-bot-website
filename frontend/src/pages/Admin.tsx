@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { api } from "../api/client";
 import { CandidatesPanel } from "../components/admin/CandidatesPanel";
 import { ChecksPanel } from "../components/admin/ChecksPanel";
+import { EmailTestPanel } from "../components/admin/EmailTestPanel";
 import { PaymentsPanel } from "../components/admin/PaymentsPanel";
 import { PromoPanel } from "../components/admin/PromoPanel";
 import { RecordsPanel } from "../components/admin/RecordsPanel";
@@ -30,6 +31,7 @@ export function Admin() {
       <RecordsPanel />
       <PromoPanel />
       <CandidatesPanel />
+      <EmailTestPanel />
     </div>
   );
 }

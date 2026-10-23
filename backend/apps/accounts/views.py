@@ -16,7 +16,8 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 
 from .models import TelegramAccount
-from .password_reset import find_user, send_reset, user_from_uid
+from .permissions import IsAdminUser
+from .password_reset import deliver_email, find_user, send_reset, user_from_uid
 from .serializers import (
     ChangePasswordSerializer,
     PasswordResetConfirmSerializer,
@@ -137,6 +138,23 @@ def _logout_everywhere(user) -> None:
 
     for token in OutstandingToken.objects.filter(user=user):
         BlacklistedToken.objects.get_or_create(token=token)
+
+
+class AdminTestEmailView(APIView):
+    """Admin panel button: sends a test email and returns Brevo's answer, so setup problems are visible."""
+
+    permission_classes = (IsAdminUser,)
+
+    def post(self, request):
+        to = str(request.data.get("to") or request.user.email or "").strip()
+        if not to or "@" not in to:
+            return Response({"error": "Նշեք email հասցե", "code": "invalid"}, status=status.HTTP_400_BAD_REQUEST)
+        problem = deliver_email(
+            to, "Goalking — test email", "✅ Goalking: email-ի կարգավորումն աշխատում է / email works / email работает."
+        )
+        if problem:
+            return Response({"error": problem, "code": "email_failed"}, status=status.HTTP_400_BAD_REQUEST)
+        return Response({"ok": True, "to": to})
 
 
 class PublicConfigView(APIView):

@@ -404,4 +404,8 @@ export const en: Record<Key, string> = {
   "reset.save": "Save password",
   "reset.done": "✅ Password changed. Log in as “{username}”.",
   "reset.requestNew": "Request a new link",
+  "admin.emailTitle": "✉️ Email (password reset)",
+  "admin.emailHint": "Check the Brevo setup: send a test email. If it fails, Brevo's answer is shown.",
+  "admin.emailSend": "Send test email",
+  "admin.emailOk": "✅ Sent to {to}. Check the Spam folder too.",
 };

@@ -42,9 +42,20 @@ def email_configured() -> bool:
 
 
 def send_email(to: str, subject: str, text: str) -> bool:
-    """Sends through Brevo's HTTP API (Railway blocks plain SMTP on lower plans)."""
-    if not email_configured() or not to:
-        return False
+    return deliver_email(to, subject, text) is None
+
+
+def email_config_problem() -> str | None:
+    missing = [name for name in ("BREVO_API_KEY", "EMAIL_FROM") if not getattr(settings, name)]
+    return f"Railway Variables: missing {', '.join(missing)}" if missing else None
+
+
+def deliver_email(to: str, subject: str, text: str) -> str | None:
+    """Sends through Brevo's HTTP API (Railway blocks plain SMTP on lower plans).
+    Returns None on success, otherwise a short reason (Brevo's own message when it gives one)."""
+    problem = email_config_problem()
+    if problem or not to:
+        return problem or "no recipient"
     try:
         r = requests.post(
             "https://api.brevo.com/v3/smtp/email",
@@ -58,12 +69,16 @@ def send_email(to: str, subject: str, text: str) -> bool:
             timeout=10,
         )
         if r.status_code >= 300:
-            logger.warning("Brevo email to user failed: HTTP %s %s", r.status_code, r.text[:200])
-            return False
-        return True
+            logger.warning("Brevo email failed: HTTP %s %s", r.status_code, r.text[:200])
+            try:
+                reason = r.json().get("message") or r.text[:200]
+            except ValueError:
+                reason = r.text[:200]
+            return f"Brevo HTTP {r.status_code}: {reason}"
+        return None
     except requests.RequestException as e:
         logger.warning("Brevo email failed: %s", e)
-        return False
+        return f"Brevo unreachable: {e.__class__.__name__}"
 
 
 def find_user(login: str):

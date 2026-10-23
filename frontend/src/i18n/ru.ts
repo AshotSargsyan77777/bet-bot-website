@@ -404,4 +404,8 @@ export const ru: Record<Key, string> = {
   "reset.save": "Сохранить пароль",
   "reset.done": "✅ Пароль изменён. Войдите как «{username}».",
   "reset.requestNew": "Запросить новую ссылку",
+  "admin.emailTitle": "✉️ Email (восстановление пароля)",
+  "admin.emailHint": "Проверьте настройку Brevo: отправьте тестовое письмо. При ошибке будет показан ответ Brevo.",
+  "admin.emailSend": "Отправить тестовое письмо",
+  "admin.emailOk": "✅ Отправлено на {to}. Проверьте и папку «Спам».",
 };
