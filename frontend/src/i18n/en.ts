@@ -261,7 +261,7 @@ export const en: Record<Key, string> = {
   "comb.show": "Show {x} variants",
   "comb.odds": "Odds: {min}–{max}",
   "comb.none": "No variants found. Try other odds or allow more matches.",
-  "comb.found": "Found {n} variants ({x})",
+  "comb.found": "Found {n} variants ({x}, up to {legs} matches)",
   "comb.pickAny": " — pick any of them.",
   "comb.pendingLong": "⏳ Your payment is awaiting approval. After approval all variants will open here and you'll get a Telegram message.",
   "comb.buyTitle": "🔒 Unlock all of today's {x} variants",
