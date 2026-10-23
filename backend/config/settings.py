@@ -212,6 +212,11 @@ else:
         }
     }
 
+# The Telegram login widget opens a popup on oauth.telegram.org that hands the login back to this page
+# through window.opener. Django's default COOP "same-origin" cuts that link (the popup just closes), so
+# popups we open keep their opener; everything else stays isolated.
+SECURE_CROSS_ORIGIN_OPENER_POLICY = "same-origin-allow-popups"
+
 # Production hardening (only when DEBUG is off)
 if not DEBUG:
     SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
@@ -222,7 +227,8 @@ if not DEBUG:
     SECURE_HSTS_SECONDS = int(os.environ.get("SECURE_HSTS_SECONDS", "31536000"))
     SECURE_HSTS_INCLUDE_SUBDOMAINS = True
     SECURE_CONTENT_TYPE_NOSNIFF = True
-    SECURE_REFERRER_POLICY = "same-origin"
+    # the widget iframe must see which site embeds it (origin only, never the full URL)
+    SECURE_REFERRER_POLICY = "strict-origin-when-cross-origin"
     X_FRAME_OPTIONS = "DENY"
 
 LOG_LEVEL = os.environ.get("LOG_LEVEL", "INFO")
