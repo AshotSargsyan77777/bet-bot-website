@@ -222,8 +222,8 @@ export const en: Record<Key, string> = {
   "games.formPending": " · form of {n} matches is still being calculated",
   "games.reset": "Clear filters",
   "games.none": "No matches found — change the date or press “Clear filters”.",
-  "games.homeL5": "Home L5",
-  "games.awayL5": "Away L5",
+  "games.homeL5": "Home · last 5 matches",
+  "games.awayL5": "Away · last 5 matches",
   "games.details": "Details →",
 
   "game.badLink": "Invalid link",
@@ -417,4 +417,12 @@ export const en: Record<Key, string> = {
   "admin.adminAdded": "✅ {username} is now an admin",
   "admin.removeAdmin": "Remove admin",
   "admin.confirmRemoveAdmin": "Remove admin rights from {username}?",
+  "st.upcoming": "Not started",
+  "st.halftime": "Half-time",
+  "st.live": "Live",
+  "st.finished": "Finished",
+  "st.postponed": "Postponed",
+  "st.cancelled": "Cancelled",
+  "st.interrupted": "Interrupted",
+  "games.formStat": "wins {w}% · {g} goals/match",
 };
