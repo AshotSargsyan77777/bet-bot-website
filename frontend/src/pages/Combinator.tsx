@@ -1,9 +1,21 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { api, type Paginated } from "../api/client";
 import { PageHeader } from "../components/PageHeader";
 import { CheckPreview } from "../components/stats/CheckPreview";
+import { useDebouncedValue } from "../hooks/useDebouncedValue";
 import { useT, usePkgLabel, type Key } from "../i18n";
+
+const LEGS_KEY = "combinator.maxLegs";
+
+/** The "up to N matches" choice is remembered in this browser (page reloads, coming back after paying). */
+function savedMaxLegs(): string {
+  try {
+    return localStorage.getItem(LEGS_KEY) || "7";
+  } catch {
+    return "7";
+  }
+}
 
 type Tier = { key: string; label: string; price: number; min: number; max: number };
 type PoolInfo = {
@@ -99,7 +111,8 @@ export function Combinator() {
   });
 
   const [tierKey, setTierKey] = useState("combo_x10");
-  const [maxLegs, setMaxLegs] = useState("7");
+  const [maxLegs, setMaxLegs] = useState(savedMaxLegs);
+  const debouncedLegs = useDebouncedValue(maxLegs, 500);
   const [formError, setFormError] = useState("");
 
   const tiers = pool.data?.tiers ?? [];
@@ -117,7 +130,20 @@ export function Combinator() {
     if (!err) search.mutate({ tier: key, legs });
   };
 
-  const data = search.data;
+  const searchedLegs = search.variables?.legs;
+  // After the number of matches changes, search again (variants for the old number must not stay on screen).
+  useEffect(() => {
+    try {
+      localStorage.setItem(LEGS_KEY, debouncedLegs);
+    } catch {
+      // not remembered (private mode); the search still works
+    }
+    if (search.variables && String(search.variables.legs) !== debouncedLegs) run(search.variables.tier, debouncedLegs);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- only when the number of matches settles
+  }, [debouncedLegs]);
+
+  // results are shown only for the number currently in the field
+  const data = searchedLegs != null && String(searchedLegs) === maxLegs.trim() ? search.data : undefined;
   const results = data?.results ?? [];
 
   return (
@@ -184,7 +210,7 @@ export function Combinator() {
         )}
         {data && results.length > 0 && (
           <p>
-            {t("comb.found", { n: results.length, x: short(data.tier) })}
+            {t("comb.found", { n: results.length, x: short(data.tier), legs: searchedLegs ?? "" })}
             {data.unlocked ? t("comb.pickAny") : ""}
           </p>
         )}
